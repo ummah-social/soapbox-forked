@@ -5,8 +5,9 @@ import { Link } from 'react-router-dom';
 
 import { fetchAccountFamiliarFollowers } from 'soapbox/actions/familiar-followers';
 import { openModal } from 'soapbox/actions/modals';
+import AvatarStack from 'soapbox/components/avatar-stack';
 import HoverRefWrapper from 'soapbox/components/hover-ref-wrapper';
-import { Text } from 'soapbox/components/ui';
+import { HStack, Text } from 'soapbox/components/ui';
 import VerificationBadge from 'soapbox/components/verification-badge';
 import { useAppDispatch, useAppSelector, useFeatures } from 'soapbox/hooks';
 import { makeGetAccount } from 'soapbox/selectors';
@@ -16,7 +17,7 @@ import type { Account } from 'soapbox/types/entities';
 const getAccount = makeGetAccount();
 
 interface IProfileFamiliarFollowers {
-  account: Account,
+  account: Account
 }
 
 const ProfileFamiliarFollowers: React.FC<IProfileFamiliarFollowers> = ({ account }) => {
@@ -30,7 +31,7 @@ const ProfileFamiliarFollowers: React.FC<IProfileFamiliarFollowers> = ({ account
     if (me && features.familiarFollowers) {
       dispatch(fetchAccountFamiliarFollowers(account.id));
     }
-  }, []);
+  }, [account.id]);
 
   const openFamiliarFollowersModal = () => {
     dispatch(openModal('FAMILIAR_FOLLOWERS', {
@@ -43,18 +44,25 @@ const ProfileFamiliarFollowers: React.FC<IProfileFamiliarFollowers> = ({ account
   }
 
   const accounts: Array<React.ReactNode> = familiarFollowers.map(account => !!account && (
-    <HoverRefWrapper accountId={account.id} inline>
-      <Link className='mention' to={`/@${account.acct}`}>
-        <span dangerouslySetInnerHTML={{ __html: account.display_name_html }} />
+    <HoverRefWrapper accountId={account.id} key={account.id} inline>
+      <Link className='mention inline-block' to={`/@${account.acct}`}>
+        <HStack space={1} alignItems='center' grow>
+          <Text
+            size='sm'
+            theme='primary'
+            truncate
+            dangerouslySetInnerHTML={{ __html: account.display_name_html }}
+          />
 
-        {account.verified && <VerificationBadge />}
+          {account.verified && <VerificationBadge />}
+        </HStack>
       </Link>
     </HoverRefWrapper>
-  )).toArray();
+  )).toArray().filter(Boolean);
 
   if (familiarFollowerIds.size > 2) {
     accounts.push(
-      <span className='hover:underline cursor-pointer' role='presentation' onClick={openFamiliarFollowersModal}>
+      <span key='_' className='cursor-pointer hover:underline' role='presentation' onClick={openFamiliarFollowersModal}>
         <FormattedMessage
           id='account.familiar_followers.more'
           defaultMessage='{count, plural, one {# other} other {# others}} you follow'
@@ -65,15 +73,18 @@ const ProfileFamiliarFollowers: React.FC<IProfileFamiliarFollowers> = ({ account
   }
 
   return (
-    <Text theme='muted' size='sm'>
-      <FormattedMessage
-        id='account.familiar_followers'
-        defaultMessage='Followed by {accounts}'
-        values={{
-          accounts: <FormattedList type='conjunction' value={accounts} />,
-        }}
-      />
-    </Text>
+    <HStack space={2} alignItems='center'>
+      <AvatarStack accountIds={familiarFollowerIds} />
+      <Text theme='muted' size='sm' tag='div'>
+        <FormattedMessage
+          id='account.familiar_followers'
+          defaultMessage='Followed by {accounts}'
+          values={{
+            accounts: <FormattedList type='conjunction' value={accounts} />,
+          }}
+        />
+      </Text>
+    </HStack>
   );
 };
 

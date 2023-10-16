@@ -11,7 +11,7 @@ import { AdKeys } from 'soapbox/queries/ads';
 import type { Ad as AdEntity } from 'soapbox/types/soapbox';
 
 interface IAd {
-  ad: AdEntity,
+  ad: AdEntity
 }
 
 /** Displays an ad in sponsored post format. */
@@ -73,7 +73,7 @@ const Ad: React.FC<IAd> = ({ ad }) => {
 
   return (
     <div className='relative'>
-      <Card className='py-6 sm:p-5' variant='rounded'>
+      <Card className='py-4' variant='rounded'>
         <Stack space={4}>
           <HStack alignItems='center' space={3}>
             <Avatar src={instance.thumbnail} size={42} />
@@ -85,7 +85,7 @@ const Ad: React.FC<IAd> = ({ ad }) => {
                 </Text>
 
                 <Icon
-                  className='w-5 h-5 stroke-accent-500'
+                  className='h-4 w-4 stroke-accent-500'
                   src={require('@tabler/icons/timeline.svg')}
                 />
               </HStack>
@@ -101,7 +101,7 @@ const Ad: React.FC<IAd> = ({ ad }) => {
 
             <Stack justifyContent='center'>
               <IconButton
-                iconClassName='stroke-gray-600 w-6 h-6'
+                iconClassName='h-6 w-6 stroke-gray-600'
                 src={require('@tabler/icons/info-circle.svg')}
                 onClick={handleInfoButtonClick}
               />
@@ -113,7 +113,7 @@ const Ad: React.FC<IAd> = ({ ad }) => {
       </Card>
 
       {showInfo && (
-        <div ref={infobox} className='absolute top-5 right-5 max-w-[234px]'>
+        <div ref={infobox} className='absolute right-5 top-5 max-w-[234px]'>
           <Card variant='rounded'>
             <Stack space={2}>
               <Text size='sm' weight='bold'>

@@ -2,18 +2,20 @@ import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { VirtuosoMockContext } from 'react-virtuoso';
 
+
 import { ChatContext } from 'soapbox/contexts/chat-context';
-import { normalizeInstance } from 'soapbox/normalizers';
-import { IAccount } from 'soapbox/queries/accounts';
+import { buildAccount } from 'soapbox/jest/factory';
+import { normalizeChatMessage, normalizeInstance } from 'soapbox/normalizers';
+import { ChatMessage } from 'soapbox/types/entities';
 
 import { __stub } from '../../../../api';
 import { queryClient, render, rootState, screen, waitFor } from '../../../../jest/test-helpers';
-import { IChat, IChatMessage } from '../../../../queries/chats';
+import { IChat } from '../../../../queries/chats';
 import ChatMessageList from '../chat-message-list';
 
 const chat: IChat = {
   accepted: true,
-  account: {
+  account: buildAccount({
     username: 'username',
     verified: true,
     id: '1',
@@ -21,7 +23,8 @@ const chat: IChat = {
     avatar: 'avatar',
     avatar_static: 'avatar',
     display_name: 'my name',
-  } as IAccount,
+  }),
+  chat_type: 'direct',
   created_at: '2020-06-10T02:05:06.000Z',
   created_by_account: '2',
   discarded_at: null,
@@ -33,25 +36,29 @@ const chat: IChat = {
   unread: 5,
 };
 
-const chatMessages: IChatMessage[] = [
-  {
+const chatMessages: ChatMessage[] = [
+  normalizeChatMessage({
     account_id: '1',
     chat_id: '14',
     content: 'this is the first chat',
     created_at: '2022-09-09T16:02:26.186Z',
+    emoji_reactions: null,
+    expiration: 1209600,
     id: '1',
     unread: false,
     pending: false,
-  },
-  {
+  }),
+  normalizeChatMessage({
     account_id: '2',
     chat_id: '14',
     content: 'this is the second chat',
     created_at: '2022-09-09T16:04:26.186Z',
+    emoji_reactions: null,
+    expiration: 1209600,
     id: '2',
     unread: true,
     pending: false,
-  },
+  }),
 ];
 
 // Mock scrollIntoView function.
@@ -64,7 +71,7 @@ Object.assign(navigator, {
 
 const store = rootState
   .set('me', '1')
-  .set('instance', normalizeInstance({ version: '3.4.1 (compatible; TruthSocial 1.0.0)' }));
+  .set('instance', normalizeInstance({ version: '3.4.1 (compatible; TruthSocial 1.0.0+unreleased)' }));
 
 const renderComponentWithChatContext = () => render(
   <VirtuosoMockContext.Provider value={{ viewportHeight: 300, itemHeight: 100 }}>

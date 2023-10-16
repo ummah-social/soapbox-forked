@@ -3,7 +3,7 @@ import { defineMessages, FormattedMessage, useIntl } from 'react-intl';
 
 import List, { ListItem } from 'soapbox/components/list';
 import { HStack, Text, Column, FormActions, Button, Stack, Icon } from 'soapbox/components/ui';
-import { unregisterSw } from 'soapbox/utils/sw';
+import { unregisterSW } from 'soapbox/utils/sw';
 
 import Indicator from './components/indicator';
 
@@ -99,7 +99,7 @@ const ServiceWorkerInfo: React.FC<IServiceWorkerInfo> = () => {
   };
 
   const handleRestart = async() => {
-    await unregisterSw();
+    await unregisterSW();
     window.location.reload();
   };
 
@@ -116,10 +116,10 @@ const ServiceWorkerInfo: React.FC<IServiceWorkerInfo> = () => {
 
           {url && (
             <ListItem label={intl.formatMessage(messages.url)}>
-              <a href={url} target='_blank' className='flex space-x-1 items-center truncate'>
+              <a href={url} target='_blank' className='flex items-center space-x-1 truncate'>
                 <span className='truncate'>{url}</span>
                 <Icon
-                  className='w-4 h-4'
+                  className='h-4 w-4'
                   src={require('@tabler/icons/external-link.svg')}
                 />
               </a>

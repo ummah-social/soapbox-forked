@@ -1,7 +1,7 @@
 'use strict';
 
 import { QueryClientProvider } from '@tanstack/react-query';
-import classNames from 'clsx';
+import clsx from 'clsx';
 import React, { useState, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { IntlProvider } from 'react-intl';
@@ -10,7 +10,6 @@ import { BrowserRouter, Switch, Redirect, Route } from 'react-router-dom';
 import { CompatRouter } from 'react-router-dom-v5-compat';
 // @ts-ignore: it doesn't have types
 import { ScrollContext } from 'react-router-scroll-4';
-
 
 import { loadInstance } from 'soapbox/actions/instance';
 import { fetchMe } from 'soapbox/actions/me';
@@ -43,7 +42,7 @@ import {
   useInstance,
   useRegistrationStatus,
 } from 'soapbox/hooks';
-import MESSAGES from 'soapbox/locales/messages';
+import MESSAGES from 'soapbox/messages';
 import { normalizeSoapboxConfig } from 'soapbox/normalizers';
 import { queryClient } from 'soapbox/queries/client';
 import { useCachedLocationHandler } from 'soapbox/utils/redirect';
@@ -91,12 +90,12 @@ const SoapboxMount = () => {
 
   const me = useAppSelector(state => state.me);
   const instance = useInstance();
-  const account = useOwnAccount();
+  const { account } = useOwnAccount();
   const soapboxConfig = useSoapboxConfig();
   const features = useFeatures();
   const { pepeEnabled } = useRegistrationStatus();
 
-  const waitlisted = account && !account.source.get('approved', true);
+  const waitlisted = account && account.source?.approved === false;
   const needsOnboarding = useAppSelector(state => state.onboarding.needsOnboarding);
   const showOnboarding = account && !waitlisted && needsOnboarding;
   const { redirectRootNoLogin } = soapboxConfig;
@@ -191,7 +190,14 @@ const SoapboxMount = () => {
                 </BundleContainer>
 
                 <GdprBanner />
-                <Toaster position='top-right' containerClassName='top-10' containerStyle={{ top: 75 }} />
+
+                <div id='toaster'>
+                  <Toaster
+                    position='top-right'
+                    containerClassName='top-10'
+                    containerStyle={{ top: 75 }}
+                  />
+                </div>
               </Route>
             </Switch>
           </ScrollContext>
@@ -202,7 +208,7 @@ const SoapboxMount = () => {
 };
 
 interface ISoapboxLoad {
-  children: React.ReactNode,
+  children: React.ReactNode
 }
 
 /** Initial data loader. */
@@ -210,7 +216,7 @@ const SoapboxLoad: React.FC<ISoapboxLoad> = ({ children }) => {
   const dispatch = useAppDispatch();
 
   const me = useAppSelector(state => state.me);
-  const account = useOwnAccount();
+  const { account } = useOwnAccount();
   const swUpdating = useAppSelector(state => state.meta.swUpdating);
   const { locale } = useLocale();
 
@@ -258,7 +264,7 @@ const SoapboxLoad: React.FC<ISoapboxLoad> = ({ children }) => {
 };
 
 interface ISoapboxHead {
-  children: React.ReactNode,
+  children: React.ReactNode
 }
 
 /** Injects metadata into site head with Helmet. */
@@ -271,7 +277,7 @@ const SoapboxHead: React.FC<ISoapboxHead> = ({ children }) => {
   const darkMode = useTheme() === 'dark';
   const themeCss = generateThemeCss(demo ? normalizeSoapboxConfig({ brandColor: '#0482d8' }) : soapboxConfig);
 
-  const bodyClass = classNames('bg-white dark:bg-gray-800 text-base h-full', {
+  const bodyClass = clsx('h-full bg-white text-base dark:bg-gray-800', {
     'no-reduce-motion': !settings.get('reduceMotion'),
     'underline-links': settings.get('underlineLinks'),
     'demetricator': settings.get('demetricator'),
@@ -280,7 +286,7 @@ const SoapboxHead: React.FC<ISoapboxHead> = ({ children }) => {
   return (
     <>
       <Helmet>
-        <html lang={locale} className={classNames('h-full', { dark: darkMode })} />
+        <html lang={locale} className={clsx('h-full', { dark: darkMode })} />
         <body className={bodyClass} dir={direction} />
         {themeCss && <style id='theme' type='text/css'>{`:root{${themeCss}}`}</style>}
         {darkMode && <style type='text/css'>{':root { color-scheme: dark; }'}</style>}

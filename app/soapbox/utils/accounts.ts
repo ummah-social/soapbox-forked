@@ -1,6 +1,6 @@
-import type { Account } from 'soapbox/types/entities';
+import type { Account } from 'soapbox/schemas';
 
-const getDomainFromURL = (account: Account): string => {
+const getDomainFromURL = (account: Pick<Account, 'url'>): string => {
   try {
     const url = account.url;
     return new URL(url).host;
@@ -9,12 +9,12 @@ const getDomainFromURL = (account: Account): string => {
   }
 };
 
-export const getDomain = (account: Account): string => {
+export const getDomain = (account: Pick<Account, 'acct' | 'url'>): string => {
   const domain = account.acct.split('@')[1];
   return domain ? domain : getDomainFromURL(account);
 };
 
-export const getBaseURL = (account: Account): string => {
+export const getBaseURL = (account: Pick<Account, 'url'>): string => {
   try {
     return new URL(account.url).origin;
   } catch {
@@ -22,21 +22,22 @@ export const getBaseURL = (account: Account): string => {
   }
 };
 
-export const getAcct = (account: Account, displayFqn: boolean): string => (
+export const getAcct = (account: Pick<Account, 'fqn' | 'acct'>, displayFqn: boolean): string => (
   displayFqn === true ? account.fqn : account.acct
 );
 
-export const isLocal = (account: Account): boolean => {
+export const isLocal = (account: Pick<Account, 'acct'>): boolean => {
   const domain: string = account.acct.split('@')[1];
   return domain === undefined ? true : false;
 };
 
-export const isRemote = (account: Account): boolean => !isLocal(account);
+export const isRemote = (account: Pick<Account, 'acct'>): boolean => !isLocal(account);
 
 /** Default header filenames from various backends */
-const DEFAULT_HEADERS = [
+const DEFAULT_HEADERS: string[] = [
   '/headers/original/missing.png', // Mastodon
   '/images/banner.png', // Pleroma
+  require('assets/images/header-missing.png'), // header not provided by backend
 ];
 
 /** Check if the avatar is a default avatar */
@@ -48,6 +49,7 @@ export const isDefaultHeader = (url: string) => {
 const DEFAULT_AVATARS = [
   '/avatars/original/missing.png', // Mastodon
   '/images/avi.png', // Pleroma
+  require('assets/images/avatar-missing.png'), // avatar not provided by backend
 ];
 
 /** Check if the avatar is a default avatar */

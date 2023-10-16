@@ -79,7 +79,7 @@ const Option: React.FC<IOption> = ({
         </div>
 
         <AutosuggestInput
-          className='rounded-md dark:!bg-transparent !bg-transparent'
+          className='rounded-md !bg-transparent dark:!bg-transparent'
           placeholder={intl.formatMessage(messages.option_placeholder, { number: index + 1 })}
           maxLength={maxChars}
           value={title}
@@ -105,7 +105,7 @@ const Option: React.FC<IOption> = ({
 };
 
 interface IPollForm {
-  composeId: string,
+  composeId: string
 }
 
 const PollForm: React.FC<IPollForm> = ({ composeId }) => {
@@ -126,10 +126,10 @@ const PollForm: React.FC<IPollForm> = ({ composeId }) => {
   const onRemoveOption = (index: number) => dispatch(removePollOption(composeId, index));
   const onChangeOption = (index: number, title: string) => dispatch(changePollOption(composeId, index, title));
   const handleAddOption = () => dispatch(addPollOption(composeId, ''));
-  const onChangeSettings = (expiresIn: string | number | undefined, isMultiple?: boolean) =>
+  const onChangeSettings = (expiresIn: number, isMultiple?: boolean) =>
     dispatch(changePollSettings(composeId, expiresIn, isMultiple));
   const handleSelectDuration = (value: number) => onChangeSettings(value, isMultiple);
-  const handleToggleMultiple = () => onChangeSettings(expiresIn, !isMultiple);
+  const handleToggleMultiple = () => onChangeSettings(Number(expiresIn), !isMultiple);
   const onRemovePoll = () => dispatch(removePoll(composeId));
 
   if (!options) {

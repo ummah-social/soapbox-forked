@@ -3,11 +3,12 @@
 import React from 'react';
 import { defineMessages, useIntl, FormattedMessage } from 'react-intl';
 
+import { usePatronUser } from 'soapbox/api/hooks';
 import Badge from 'soapbox/components/badge';
 import Markup from 'soapbox/components/markup';
+import { dateFormatOptions } from 'soapbox/components/relative-timestamp';
 import { Icon, HStack, Stack, Text } from 'soapbox/components/ui';
-import VerificationBadge from 'soapbox/components/verification-badge';
-import { useSoapboxConfig } from 'soapbox/hooks';
+import { useAppSelector, useSoapboxConfig } from 'soapbox/hooks';
 import { isLocal } from 'soapbox/utils/accounts';
 import { badgeToTag, getBadges as getAccountBadges } from 'soapbox/utils/badges';
 import { capitalize } from 'soapbox/utils/strings';
@@ -36,15 +37,18 @@ const messages = defineMessages({
 });
 
 interface IProfileInfoPanel {
-  account: Account,
+  account?: Account
   /** Username from URL params, in case the account isn't found. */
-  username: string,
+  username: string
 }
 
 /** User profile metadata, such as location, birthday, etc. */
 const ProfileInfoPanel: React.FC<IProfileInfoPanel> = ({ account, username }) => {
   const intl = useIntl();
   const { displayFqn } = useSoapboxConfig();
+  const { patronUser } = usePatronUser(account?.url);
+  const me = useAppSelector(state => state.me);
+  const ownAccount = account?.id === me;
 
   const getStaffBadge = (): React.ReactNode => {
     if (account?.admin) {
@@ -57,7 +61,7 @@ const ProfileInfoPanel: React.FC<IProfileInfoPanel> = ({ account, username }) =>
   };
 
   const getCustomBadges = (): React.ReactNode[] => {
-    const badges = getAccountBadges(account);
+    const badges = account ? getAccountBadges(account) : [];
 
     return badges.map(badge => (
       <Badge
@@ -71,7 +75,7 @@ const ProfileInfoPanel: React.FC<IProfileInfoPanel> = ({ account, username }) =>
   const getBadges = (): React.ReactNode[] => {
     const custom = getCustomBadges();
     const staffBadge = getStaffBadge();
-    const isPatron = account.getIn(['patron', 'is_patron']) === true;
+    const isPatron = patronUser?.is_patron === true;
 
     const badges = [];
 
@@ -80,14 +84,14 @@ const ProfileInfoPanel: React.FC<IProfileInfoPanel> = ({ account, username }) =>
     }
 
     if (isPatron) {
-      badges.push(<Badge slug='patron' title='Patron' key='patron' />);
+      badges.push(<Badge slug='patron' title={<FormattedMessage id='account.patron' defaultMessage='Patron' />} key='patron' />);
     }
 
     return [...badges, ...custom];
   };
 
   const renderBirthday = (): React.ReactNode => {
-    const birthday = account.birthday;
+    const birthday = account?.pleroma?.birthday;
     if (!birthday) return null;
 
     const formattedBirthday = intl.formatDate(birthday, { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' });
@@ -100,8 +104,8 @@ const ProfileInfoPanel: React.FC<IProfileInfoPanel> = ({ account, username }) =>
     return (
       <HStack alignItems='center' space={0.5}>
         <Icon
-          src={require('@tabler/icons/ballon.svg')}
-          className='w-4 h-4 text-gray-800 dark:text-gray-200'
+          src={require('@tabler/icons/balloon.svg')}
+          className='h-4 w-4 text-gray-800 dark:text-gray-200'
         />
 
         <Text size='sm'>
@@ -121,7 +125,7 @@ const ProfileInfoPanel: React.FC<IProfileInfoPanel> = ({ account, username }) =>
         <Stack space={2}>
           <Stack>
             <HStack space={1} alignItems='center'>
-              <Text size='sm' theme='muted' direction='ltr'>
+              <Text size='sm' theme='muted' direction='ltr' truncate>
                 @{username}
               </Text>
             </HStack>
@@ -131,11 +135,9 @@ const ProfileInfoPanel: React.FC<IProfileInfoPanel> = ({ account, username }) =>
     );
   }
 
-  const content = { __html: account.note_emojified };
-  const deactivated = !account.pleroma.get('is_active', true) === true;
+  const deactivated = account.pleroma?.deactivated ?? false;
   const displayNameHtml = deactivated ? { __html: intl.formatMessage(messages.deactivated) } : { __html: account.display_name_html };
   const memberSinceDate = intl.formatDate(account.created_at, { month: 'long', year: 'numeric' });
-  const verified = account.verified;
   const badges = getBadges();
 
   return (
@@ -143,9 +145,7 @@ const ProfileInfoPanel: React.FC<IProfileInfoPanel> = ({ account, username }) =>
       <Stack space={2}>
         <Stack>
           <HStack space={1} alignItems='center'>
-            <Text size='lg' weight='bold' dangerouslySetInnerHTML={displayNameHtml} />
-
-            {verified && <VerificationBadge />}
+            <Text size='lg' weight='bold' dangerouslySetInnerHTML={displayNameHtml} truncate />
 
             {account.bot && <Badge slug='bot' title={intl.formatMessage(messages.bot)} />}
 
@@ -157,7 +157,7 @@ const ProfileInfoPanel: React.FC<IProfileInfoPanel> = ({ account, username }) =>
           </HStack>
 
           <HStack alignItems='center' space={0.5}>
-            <Text size='sm' theme='muted' direction='ltr'>
+            <Text size='sm' theme='muted' direction='ltr' truncate>
               @{displayFqn ? account.fqn : account.acct}
             </Text>
 
@@ -165,7 +165,7 @@ const ProfileInfoPanel: React.FC<IProfileInfoPanel> = ({ account, username }) =>
               <Icon
                 src={require('@tabler/icons/lock.svg')}
                 alt={intl.formatMessage(messages.account_locked)}
-                className='w-4 h-4 text-gray-600'
+                className='h-4 w-4 text-gray-600'
               />
             )}
           </HStack>
@@ -174,18 +174,18 @@ const ProfileInfoPanel: React.FC<IProfileInfoPanel> = ({ account, username }) =>
         <ProfileStats account={account} />
 
         {account.note.length > 0 && (
-          <Markup size='sm' dangerouslySetInnerHTML={content} />
+          <Markup size='sm' dangerouslySetInnerHTML={{ __html: account.note_emojified }} truncate />
         )}
 
-        <div className='flex flex-col md:flex-row items-start md:flex-wrap md:items-center gap-2'>
+        <div className='flex flex-col items-start gap-2 md:flex-row md:flex-wrap md:items-center'>
           {isLocal(account) ? (
             <HStack alignItems='center' space={0.5}>
               <Icon
                 src={require('@tabler/icons/calendar.svg')}
-                className='w-4 h-4 text-gray-800 dark:text-gray-200'
+                className='h-4 w-4 text-gray-800 dark:text-gray-200'
               />
 
-              <Text size='sm'>
+              <Text size='sm' title={intl.formatDate(account.created_at, dateFormatOptions)}>
                 <FormattedMessage
                   id='account.member_since' defaultMessage='Joined {date}' values={{
                     date: memberSinceDate,
@@ -199,7 +199,7 @@ const ProfileInfoPanel: React.FC<IProfileInfoPanel> = ({ account, username }) =>
             <HStack alignItems='center' space={0.5}>
               <Icon
                 src={require('@tabler/icons/map-pin.svg')}
-                className='w-4 h-4 text-gray-800 dark:text-gray-200'
+                className='h-4 w-4 text-gray-800 dark:text-gray-200'
               />
 
               <Text size='sm'>
@@ -212,13 +212,13 @@ const ProfileInfoPanel: React.FC<IProfileInfoPanel> = ({ account, username }) =>
             <HStack alignItems='center' space={0.5}>
               <Icon
                 src={require('@tabler/icons/link.svg')}
-                className='w-4 h-4 text-gray-800 dark:text-gray-200'
+                className='h-4 w-4 text-gray-800 dark:text-gray-200'
               />
 
               <div className='max-w-[300px]'>
                 <Text size='sm' truncate>
                   {isSafeUrl(account.website) ? (
-                    <a className='text-primary-600 dark:text-accent-blue hover:underline' href={account.website} target='_blank'>{account.website}</a>
+                    <a className='text-primary-600 hover:underline dark:text-accent-blue' href={account.website} target='_blank'>{account.website}</a>
                   ) : (
                     account.website
                   )}
@@ -230,10 +230,10 @@ const ProfileInfoPanel: React.FC<IProfileInfoPanel> = ({ account, username }) =>
           {renderBirthday()}
         </div>
 
-        <ProfileFamiliarFollowers account={account} />
+        {ownAccount ? null : <ProfileFamiliarFollowers account={account} />}
       </Stack>
 
-      {account.fields.size > 0 && (
+      {account.fields.length > 0 && (
         <Stack space={2} className='mt-4 xl:hidden'>
           {account.fields.map((field, i) => (
             <ProfileField field={field} key={i} />

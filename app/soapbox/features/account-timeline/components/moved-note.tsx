@@ -5,19 +5,19 @@ import Account from 'soapbox/components/account';
 import Icon from 'soapbox/components/icon';
 import { HStack, Text } from 'soapbox/components/ui';
 
-import type { Account as AccountEntity } from 'soapbox/types/entities';
+import type { Account as AccountEntity } from 'soapbox/schemas';
 
 interface IMovedNote {
-  from: AccountEntity,
-  to: AccountEntity,
+  from: AccountEntity
+  to: AccountEntity
 }
 
 const MovedNote: React.FC<IMovedNote> = ({ from, to }) => (
-  <div className='account__moved-note'>
+  <div className='p-4'>
     <HStack className='mb-2' alignItems='center' space={1.5}>
       <Icon
         src={require('@tabler/icons/briefcase.svg')}
-        className='text-primary-600 dark:text-primary-400 flex-none'
+        className='flex-none text-primary-600 dark:text-primary-400'
       />
 
       <div className='truncate'>

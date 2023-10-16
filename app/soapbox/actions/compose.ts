@@ -4,7 +4,9 @@ import throttle from 'lodash/throttle';
 import { defineMessages, IntlShape } from 'react-intl';
 
 import api from 'soapbox/api';
-import { search as emojiSearch } from 'soapbox/features/emoji/emoji-mart-search-light';
+import { isNativeEmoji } from 'soapbox/features/emoji';
+import emojiSearch from 'soapbox/features/emoji/search';
+import { selectAccount, selectOwnAccount } from 'soapbox/selectors';
 import { tagHistory } from 'soapbox/settings';
 import toast from 'soapbox/toast';
 import { isLoggedIn } from 'soapbox/utils/auth';
@@ -19,69 +21,71 @@ import { openModal, closeModal } from './modals';
 import { getSettings } from './settings';
 import { createStatus } from './statuses';
 
-import type { Emoji } from 'soapbox/components/autosuggest-emoji';
 import type { AutoSuggestion } from 'soapbox/components/autosuggest-input';
+import type { Emoji } from 'soapbox/features/emoji';
+import type { Account, Group } from 'soapbox/schemas';
 import type { AppDispatch, RootState } from 'soapbox/store';
-import type { Account, APIEntity, Status, Tag } from 'soapbox/types/entities';
+import type { APIEntity, Status, Tag } from 'soapbox/types/entities';
 import type { History } from 'soapbox/types/history';
 
 const { CancelToken, isCancel } = axios;
 
 let cancelFetchComposeSuggestionsAccounts: Canceler;
 
-const COMPOSE_CHANGE          = 'COMPOSE_CHANGE';
-const COMPOSE_SUBMIT_REQUEST  = 'COMPOSE_SUBMIT_REQUEST';
-const COMPOSE_SUBMIT_SUCCESS  = 'COMPOSE_SUBMIT_SUCCESS';
-const COMPOSE_SUBMIT_FAIL     = 'COMPOSE_SUBMIT_FAIL';
-const COMPOSE_REPLY           = 'COMPOSE_REPLY';
-const COMPOSE_EVENT_REPLY     = 'COMPOSE_EVENT_REPLY';
-const COMPOSE_REPLY_CANCEL    = 'COMPOSE_REPLY_CANCEL';
-const COMPOSE_QUOTE           = 'COMPOSE_QUOTE';
-const COMPOSE_QUOTE_CANCEL    = 'COMPOSE_QUOTE_CANCEL';
-const COMPOSE_DIRECT          = 'COMPOSE_DIRECT';
-const COMPOSE_MENTION         = 'COMPOSE_MENTION';
-const COMPOSE_RESET           = 'COMPOSE_RESET';
-const COMPOSE_UPLOAD_REQUEST  = 'COMPOSE_UPLOAD_REQUEST';
-const COMPOSE_UPLOAD_SUCCESS  = 'COMPOSE_UPLOAD_SUCCESS';
-const COMPOSE_UPLOAD_FAIL     = 'COMPOSE_UPLOAD_FAIL';
-const COMPOSE_UPLOAD_PROGRESS = 'COMPOSE_UPLOAD_PROGRESS';
-const COMPOSE_UPLOAD_UNDO     = 'COMPOSE_UPLOAD_UNDO';
+const COMPOSE_CHANGE          = 'COMPOSE_CHANGE' as const;
+const COMPOSE_SUBMIT_REQUEST  = 'COMPOSE_SUBMIT_REQUEST' as const;
+const COMPOSE_SUBMIT_SUCCESS  = 'COMPOSE_SUBMIT_SUCCESS' as const;
+const COMPOSE_SUBMIT_FAIL     = 'COMPOSE_SUBMIT_FAIL' as const;
+const COMPOSE_REPLY           = 'COMPOSE_REPLY' as const;
+const COMPOSE_EVENT_REPLY     = 'COMPOSE_EVENT_REPLY' as const;
+const COMPOSE_REPLY_CANCEL    = 'COMPOSE_REPLY_CANCEL' as const;
+const COMPOSE_QUOTE           = 'COMPOSE_QUOTE' as const;
+const COMPOSE_QUOTE_CANCEL    = 'COMPOSE_QUOTE_CANCEL' as const;
+const COMPOSE_DIRECT          = 'COMPOSE_DIRECT' as const;
+const COMPOSE_MENTION         = 'COMPOSE_MENTION' as const;
+const COMPOSE_RESET           = 'COMPOSE_RESET' as const;
+const COMPOSE_UPLOAD_REQUEST  = 'COMPOSE_UPLOAD_REQUEST' as const;
+const COMPOSE_UPLOAD_SUCCESS  = 'COMPOSE_UPLOAD_SUCCESS' as const;
+const COMPOSE_UPLOAD_FAIL     = 'COMPOSE_UPLOAD_FAIL' as const;
+const COMPOSE_UPLOAD_PROGRESS = 'COMPOSE_UPLOAD_PROGRESS' as const;
+const COMPOSE_UPLOAD_UNDO     = 'COMPOSE_UPLOAD_UNDO' as const;
+const COMPOSE_GROUP_POST      = 'COMPOSE_GROUP_POST' as const;
+const COMPOSE_SET_GROUP_TIMELINE_VISIBLE = 'COMPOSE_SET_GROUP_TIMELINE_VISIBLE' as const;
 
-const COMPOSE_SUGGESTIONS_CLEAR = 'COMPOSE_SUGGESTIONS_CLEAR';
-const COMPOSE_SUGGESTIONS_READY = 'COMPOSE_SUGGESTIONS_READY';
-const COMPOSE_SUGGESTION_SELECT = 'COMPOSE_SUGGESTION_SELECT';
-const COMPOSE_SUGGESTION_TAGS_UPDATE = 'COMPOSE_SUGGESTION_TAGS_UPDATE';
+const COMPOSE_SUGGESTIONS_CLEAR = 'COMPOSE_SUGGESTIONS_CLEAR' as const;
+const COMPOSE_SUGGESTIONS_READY = 'COMPOSE_SUGGESTIONS_READY' as const;
+const COMPOSE_SUGGESTION_SELECT = 'COMPOSE_SUGGESTION_SELECT' as const;
+const COMPOSE_SUGGESTION_TAGS_UPDATE = 'COMPOSE_SUGGESTION_TAGS_UPDATE' as const;
 
-const COMPOSE_TAG_HISTORY_UPDATE = 'COMPOSE_TAG_HISTORY_UPDATE';
+const COMPOSE_TAG_HISTORY_UPDATE = 'COMPOSE_TAG_HISTORY_UPDATE' as const;
 
-const COMPOSE_SPOILERNESS_CHANGE = 'COMPOSE_SPOILERNESS_CHANGE';
-const COMPOSE_TYPE_CHANGE = 'COMPOSE_TYPE_CHANGE';
-const COMPOSE_SPOILER_TEXT_CHANGE = 'COMPOSE_SPOILER_TEXT_CHANGE';
-const COMPOSE_VISIBILITY_CHANGE  = 'COMPOSE_VISIBILITY_CHANGE';
-const COMPOSE_LISTABILITY_CHANGE = 'COMPOSE_LISTABILITY_CHANGE';
-const COMPOSE_COMPOSING_CHANGE = 'COMPOSE_COMPOSING_CHANGE';
+const COMPOSE_SPOILERNESS_CHANGE = 'COMPOSE_SPOILERNESS_CHANGE' as const;
+const COMPOSE_TYPE_CHANGE = 'COMPOSE_TYPE_CHANGE' as const;
+const COMPOSE_SPOILER_TEXT_CHANGE = 'COMPOSE_SPOILER_TEXT_CHANGE' as const;
+const COMPOSE_VISIBILITY_CHANGE  = 'COMPOSE_VISIBILITY_CHANGE' as const;
+const COMPOSE_LISTABILITY_CHANGE = 'COMPOSE_LISTABILITY_CHANGE' as const;
 
-const COMPOSE_EMOJI_INSERT = 'COMPOSE_EMOJI_INSERT';
+const COMPOSE_EMOJI_INSERT = 'COMPOSE_EMOJI_INSERT' as const;
 
-const COMPOSE_UPLOAD_CHANGE_REQUEST     = 'COMPOSE_UPLOAD_UPDATE_REQUEST';
-const COMPOSE_UPLOAD_CHANGE_SUCCESS     = 'COMPOSE_UPLOAD_UPDATE_SUCCESS';
-const COMPOSE_UPLOAD_CHANGE_FAIL        = 'COMPOSE_UPLOAD_UPDATE_FAIL';
+const COMPOSE_UPLOAD_CHANGE_REQUEST     = 'COMPOSE_UPLOAD_UPDATE_REQUEST' as const;
+const COMPOSE_UPLOAD_CHANGE_SUCCESS     = 'COMPOSE_UPLOAD_UPDATE_SUCCESS' as const;
+const COMPOSE_UPLOAD_CHANGE_FAIL        = 'COMPOSE_UPLOAD_UPDATE_FAIL' as const;
 
-const COMPOSE_POLL_ADD             = 'COMPOSE_POLL_ADD';
-const COMPOSE_POLL_REMOVE          = 'COMPOSE_POLL_REMOVE';
-const COMPOSE_POLL_OPTION_ADD      = 'COMPOSE_POLL_OPTION_ADD';
-const COMPOSE_POLL_OPTION_CHANGE   = 'COMPOSE_POLL_OPTION_CHANGE';
-const COMPOSE_POLL_OPTION_REMOVE   = 'COMPOSE_POLL_OPTION_REMOVE';
-const COMPOSE_POLL_SETTINGS_CHANGE = 'COMPOSE_POLL_SETTINGS_CHANGE';
+const COMPOSE_POLL_ADD             = 'COMPOSE_POLL_ADD' as const;
+const COMPOSE_POLL_REMOVE          = 'COMPOSE_POLL_REMOVE' as const;
+const COMPOSE_POLL_OPTION_ADD      = 'COMPOSE_POLL_OPTION_ADD' as const;
+const COMPOSE_POLL_OPTION_CHANGE   = 'COMPOSE_POLL_OPTION_CHANGE' as const;
+const COMPOSE_POLL_OPTION_REMOVE   = 'COMPOSE_POLL_OPTION_REMOVE' as const;
+const COMPOSE_POLL_SETTINGS_CHANGE = 'COMPOSE_POLL_SETTINGS_CHANGE' as const;
 
-const COMPOSE_SCHEDULE_ADD    = 'COMPOSE_SCHEDULE_ADD';
-const COMPOSE_SCHEDULE_SET    = 'COMPOSE_SCHEDULE_SET';
-const COMPOSE_SCHEDULE_REMOVE = 'COMPOSE_SCHEDULE_REMOVE';
+const COMPOSE_SCHEDULE_ADD    = 'COMPOSE_SCHEDULE_ADD' as const;
+const COMPOSE_SCHEDULE_SET    = 'COMPOSE_SCHEDULE_SET' as const;
+const COMPOSE_SCHEDULE_REMOVE = 'COMPOSE_SCHEDULE_REMOVE' as const;
 
-const COMPOSE_ADD_TO_MENTIONS = 'COMPOSE_ADD_TO_MENTIONS';
-const COMPOSE_REMOVE_FROM_MENTIONS = 'COMPOSE_REMOVE_FROM_MENTIONS';
+const COMPOSE_ADD_TO_MENTIONS = 'COMPOSE_ADD_TO_MENTIONS' as const;
+const COMPOSE_REMOVE_FROM_MENTIONS = 'COMPOSE_REMOVE_FROM_MENTIONS' as const;
 
-const COMPOSE_SET_STATUS = 'COMPOSE_SET_STATUS';
+const COMPOSE_SET_STATUS = 'COMPOSE_SET_STATUS' as const;
 
 const messages = defineMessages({
   exceededImageSizeLimit: { id: 'upload_error.image_size_limit', defaultMessage: 'Image exceeds the current file size limit ({limit})' },
@@ -97,12 +101,24 @@ const messages = defineMessages({
   replyMessage: { id: 'confirmations.reply.message', defaultMessage: 'Replying now will overwrite the message you are currently composing. Are you sure you want to proceed?' },
 });
 
+interface ComposeSetStatusAction {
+  type: typeof COMPOSE_SET_STATUS
+  id: string
+  status: Status
+  rawText: string
+  explicitAddressing: boolean
+  spoilerText?: string
+  contentType?: string | false
+  v: ReturnType<typeof parseVersion>
+  withRedraft?: boolean
+}
+
 const setComposeToStatus = (status: Status, rawText: string, spoilerText?: string, contentType?: string | false, withRedraft?: boolean) =>
   (dispatch: AppDispatch, getState: () => RootState) => {
     const { instance } = getState();
     const { explicitAddressing } = getFeatures(instance);
 
-    dispatch({
+    const action: ComposeSetStatusAction = {
       type: COMPOSE_SET_STATUS,
       id: 'compose-modal',
       status,
@@ -112,7 +128,9 @@ const setComposeToStatus = (status: Status, rawText: string, spoilerText?: strin
       contentType,
       v: parseVersion(instance.version),
       withRedraft,
-    });
+    };
+
+    dispatch(action);
   };
 
 const changeCompose = (composeId: string, text: string) => ({
@@ -121,20 +139,35 @@ const changeCompose = (composeId: string, text: string) => ({
   text: text,
 });
 
+interface ComposeReplyAction {
+  type: typeof COMPOSE_REPLY
+  id: string
+  status: Status
+  account: Account
+  explicitAddressing: boolean
+  preserveSpoilers: boolean
+}
+
 const replyCompose = (status: Status) =>
   (dispatch: AppDispatch, getState: () => RootState) => {
     const state = getState();
     const instance = state.instance;
     const { explicitAddressing } = getFeatures(instance);
+    const preserveSpoilers = !!getSettings(state).get('preserveSpoilers');
+    const account = selectOwnAccount(state);
 
-    dispatch({
+    if (!account) return;
+
+    const action: ComposeReplyAction = {
       type: COMPOSE_REPLY,
       id: 'compose-modal',
       status: status,
-      account: state.accounts.get(state.me),
+      account,
       explicitAddressing,
-    });
+      preserveSpoilers,
+    };
 
+    dispatch(action);
     dispatch(openModal('COMPOSE'));
   };
 
@@ -143,20 +176,29 @@ const cancelReplyCompose = () => ({
   id: 'compose-modal',
 });
 
+interface ComposeQuoteAction {
+  type: typeof COMPOSE_QUOTE
+  id: string
+  status: Status
+  account: Account | undefined
+  explicitAddressing: boolean
+}
+
 const quoteCompose = (status: Status) =>
   (dispatch: AppDispatch, getState: () => RootState) => {
     const state = getState();
     const instance = state.instance;
     const { explicitAddressing } = getFeatures(instance);
 
-    dispatch({
+    const action: ComposeQuoteAction = {
       type: COMPOSE_QUOTE,
       id: 'compose-modal',
       status: status,
-      account: state.accounts.get(state.me),
+      account: selectOwnAccount(state),
       explicitAddressing,
-    });
+    };
 
+    dispatch(action);
     dispatch(openModal('COMPOSE'));
   };
 
@@ -165,43 +207,67 @@ const cancelQuoteCompose = () => ({
   id: 'compose-modal',
 });
 
+const groupComposeModal = (group: Group) =>
+  (dispatch: AppDispatch, getState: () => RootState) => {
+    const composeId = `group:${group.id}`;
+
+    dispatch(groupCompose(composeId, group.id));
+    dispatch(openModal('COMPOSE', { composeId }));
+  };
+
 const resetCompose = (composeId = 'compose-modal') => ({
   type: COMPOSE_RESET,
   id: composeId,
 });
 
+interface ComposeMentionAction {
+  type: typeof COMPOSE_MENTION
+  id: string
+  account: Account
+}
+
 const mentionCompose = (account: Account) =>
   (dispatch: AppDispatch) => {
-    dispatch({
+    const action: ComposeMentionAction = {
       type: COMPOSE_MENTION,
       id: 'compose-modal',
       account: account,
-    });
+    };
 
+    dispatch(action);
     dispatch(openModal('COMPOSE'));
   };
 
+interface ComposeDirectAction {
+  type: typeof COMPOSE_DIRECT
+  id: string
+  account: Account
+}
+
 const directCompose = (account: Account) =>
   (dispatch: AppDispatch) => {
-    dispatch({
+    const action: ComposeDirectAction = {
       type: COMPOSE_DIRECT,
       id: 'compose-modal',
-      account: account,
-    });
+      account,
+    };
 
+    dispatch(action);
     dispatch(openModal('COMPOSE'));
   };
 
 const directComposeById = (accountId: string) =>
   (dispatch: AppDispatch, getState: () => RootState) => {
-    const account = getState().accounts.get(accountId);
+    const account = selectAccount(getState(), accountId);
+    if (!account) return;
 
-    dispatch({
+    const action: ComposeDirectAction = {
       type: COMPOSE_DIRECT,
       id: 'compose-modal',
-      account: account,
-    });
+      account,
+    };
 
+    dispatch(action);
     dispatch(openModal('COMPOSE'));
   };
 
@@ -276,7 +342,7 @@ const submitCompose = (composeId: string, routerHistory?: History, force = false
 
     const idempotencyKey = compose.idempotencyKey;
 
-    const params = {
+    const params: Record<string, any> = {
       status,
       in_reply_to_id: compose.in_reply_to,
       quote_id: compose.quote,
@@ -289,6 +355,11 @@ const submitCompose = (composeId: string, routerHistory?: History, force = false
       scheduled_at: compose.schedule,
       to,
     };
+
+    if (compose.privacy === 'group') {
+      params.group_id = compose.group_id;
+      params.group_timeline_visible = compose.group_timeline_visible; // Truth Social
+    }
 
     dispatch(createStatus(params, idempotencyKey, statusId)).then(function(data) {
       if (!statusId && data.visibility === 'direct' && getState().conversations.mounted <= 0 && routerHistory) {
@@ -470,6 +541,18 @@ const undoUploadCompose = (composeId: string, media_id: string) => ({
   media_id: media_id,
 });
 
+const groupCompose = (composeId: string, groupId: string) => ({
+  type: COMPOSE_GROUP_POST,
+  id: composeId,
+  group_id: groupId,
+});
+
+const setGroupTimelineVisible = (composeId: string, groupTimelineVisible: boolean) => ({
+  type: COMPOSE_SET_GROUP_TIMELINE_VISIBLE,
+  id: composeId,
+  groupTimelineVisible,
+});
+
 const clearComposeSuggestions = (composeId: string) => {
   if (cancelFetchComposeSuggestionsAccounts) {
     cancelFetchComposeSuggestionsAccounts();
@@ -504,7 +587,9 @@ const fetchComposeSuggestionsAccounts = throttle((dispatch, getState, composeId,
 }, 200, { leading: true, trailing: true });
 
 const fetchComposeSuggestionsEmojis = (dispatch: AppDispatch, getState: () => RootState, composeId: string, token: string) => {
-  const results = emojiSearch(token.replace(':', ''), { maxResults: 5 } as any);
+  const state = getState();
+  const results = emojiSearch(token.replace(':', ''), { maxResults: 5 }, state.custom_emojis);
+
   dispatch(readyComposeSuggestionsEmojis(composeId, token, results));
 };
 
@@ -530,6 +615,14 @@ const fetchComposeSuggestions = (composeId: string, token: string) =>
     }
   };
 
+interface ComposeSuggestionsReadyAction {
+  type: typeof COMPOSE_SUGGESTIONS_READY
+  id: string
+  token: string
+  emojis?: Emoji[]
+  accounts?: APIEntity[]
+}
+
 const readyComposeSuggestionsEmojis = (composeId: string, token: string, emojis: Emoji[]) => ({
   type: COMPOSE_SUGGESTIONS_READY,
   id: composeId,
@@ -544,31 +637,42 @@ const readyComposeSuggestionsAccounts = (composeId: string, token: string, accou
   accounts,
 });
 
+interface ComposeSuggestionSelectAction {
+  type: typeof COMPOSE_SUGGESTION_SELECT
+  id: string
+  position: number
+  token: string | null
+  completion: string
+  path: Array<string | number>
+}
+
 const selectComposeSuggestion = (composeId: string, position: number, token: string | null, suggestion: AutoSuggestion, path: Array<string | number>) =>
   (dispatch: AppDispatch, getState: () => RootState) => {
-    let completion, startPosition;
+    let completion = '', startPosition = position;
 
     if (typeof suggestion === 'object' && suggestion.id) {
-      completion    = suggestion.native || suggestion.colons;
+      completion    = isNativeEmoji(suggestion) ? suggestion.native : suggestion.colons;
       startPosition = position - 1;
 
       dispatch(useEmoji(suggestion));
     } else if (typeof suggestion === 'string' && suggestion[0] === '#') {
       completion    = suggestion;
       startPosition = position - 1;
-    } else {
-      completion    = getState().accounts.get(suggestion)!.acct;
+    } else if (typeof suggestion === 'string') {
+      completion    = selectAccount(getState(), suggestion)!.acct;
       startPosition = position;
     }
 
-    dispatch({
+    const action: ComposeSuggestionSelectAction = {
       type: COMPOSE_SUGGESTION_SELECT,
       id: composeId,
       position: startPosition,
       token,
       completion,
       path,
-    });
+    };
+
+    dispatch(action);
   };
 
 const updateSuggestionTags = (composeId: string, token: string, currentTrends: ImmutableList<Tag>) => ({
@@ -678,7 +782,7 @@ const removePollOption = (composeId: string, index: number) => ({
   index,
 });
 
-const changePollSettings = (composeId: string, expiresIn?: string | number, isMultiple?: boolean) => ({
+const changePollSettings = (composeId: string, expiresIn?: number, isMultiple?: boolean) => ({
   type: COMPOSE_POLL_SETTINGS_CHANGE,
   id: composeId,
   expiresIn,
@@ -692,29 +796,55 @@ const openComposeWithText = (composeId: string, text = '') =>
     dispatch(changeCompose(composeId, text));
   };
 
+interface ComposeAddToMentionsAction {
+  type: typeof COMPOSE_ADD_TO_MENTIONS
+  id: string
+  account: string
+}
+
 const addToMentions = (composeId: string, accountId: string) =>
   (dispatch: AppDispatch, getState: () => RootState) => {
     const state = getState();
-    const acct = state.accounts.get(accountId)!.acct;
+    const account = selectAccount(state, accountId);
+    if (!account) return;
 
-    return dispatch({
+    const action: ComposeAddToMentionsAction = {
       type: COMPOSE_ADD_TO_MENTIONS,
       id: composeId,
-      account: acct,
-    });
+      account: account.acct,
+    };
+
+    return dispatch(action);
   };
+
+interface ComposeRemoveFromMentionsAction {
+  type: typeof COMPOSE_REMOVE_FROM_MENTIONS
+  id: string
+  account: string
+}
 
 const removeFromMentions = (composeId: string, accountId: string) =>
   (dispatch: AppDispatch, getState: () => RootState) => {
     const state = getState();
-    const acct = state.accounts.get(accountId)!.acct;
+    const account = selectAccount(state, accountId);
+    if (!account) return;
 
-    return dispatch({
+    const action: ComposeRemoveFromMentionsAction = {
       type: COMPOSE_REMOVE_FROM_MENTIONS,
       id: composeId,
-      account: acct,
-    });
+      account: account.acct,
+    };
+
+    return dispatch(action);
   };
+
+interface ComposeEventReplyAction {
+  type: typeof COMPOSE_EVENT_REPLY
+  id: string
+  status: Status
+  account: Account
+  explicitAddressing: boolean
+}
 
 const eventDiscussionCompose = (composeId: string, status: Status) =>
   (dispatch: AppDispatch, getState: () => RootState) => {
@@ -722,14 +852,60 @@ const eventDiscussionCompose = (composeId: string, status: Status) =>
     const instance = state.instance;
     const { explicitAddressing } = getFeatures(instance);
 
-    dispatch({
+    return dispatch({
       type: COMPOSE_EVENT_REPLY,
       id: composeId,
       status: status,
-      account: state.accounts.get(state.me),
+      account: selectOwnAccount(state),
       explicitAddressing,
     });
   };
+
+type ComposeAction =
+  ComposeSetStatusAction
+  | ReturnType<typeof changeCompose>
+  | ComposeReplyAction
+  | ReturnType<typeof cancelReplyCompose>
+  | ComposeQuoteAction
+  | ReturnType<typeof cancelQuoteCompose>
+  | ReturnType<typeof resetCompose>
+  | ComposeMentionAction
+  | ComposeDirectAction
+  | ReturnType<typeof submitComposeRequest>
+  | ReturnType<typeof submitComposeSuccess>
+  | ReturnType<typeof submitComposeFail>
+  | ReturnType<typeof changeUploadComposeRequest>
+  | ReturnType<typeof changeUploadComposeSuccess>
+  | ReturnType<typeof changeUploadComposeFail>
+  | ReturnType<typeof uploadComposeRequest>
+  | ReturnType<typeof uploadComposeProgress>
+  | ReturnType<typeof uploadComposeSuccess>
+  | ReturnType<typeof uploadComposeFail>
+  | ReturnType<typeof undoUploadCompose>
+  | ReturnType<typeof groupCompose>
+  | ReturnType<typeof setGroupTimelineVisible>
+  | ReturnType<typeof clearComposeSuggestions>
+  | ComposeSuggestionsReadyAction
+  | ComposeSuggestionSelectAction
+  | ReturnType<typeof updateSuggestionTags>
+  | ReturnType<typeof updateTagHistory>
+  | ReturnType<typeof changeComposeSpoilerness>
+  | ReturnType<typeof changeComposeContentType>
+  | ReturnType<typeof changeComposeSpoilerText>
+  | ReturnType<typeof changeComposeVisibility>
+  | ReturnType<typeof insertEmojiCompose>
+  | ReturnType<typeof addPoll>
+  | ReturnType<typeof removePoll>
+  | ReturnType<typeof addSchedule>
+  | ReturnType<typeof setSchedule>
+  | ReturnType<typeof removeSchedule>
+  | ReturnType<typeof addPollOption>
+  | ReturnType<typeof changePollOption>
+  | ReturnType<typeof removePollOption>
+  | ReturnType<typeof changePollSettings>
+  | ComposeAddToMentionsAction
+  | ComposeRemoveFromMentionsAction
+  | ComposeEventReplyAction
 
 export {
   COMPOSE_CHANGE,
@@ -749,6 +925,7 @@ export {
   COMPOSE_UPLOAD_FAIL,
   COMPOSE_UPLOAD_PROGRESS,
   COMPOSE_UPLOAD_UNDO,
+  COMPOSE_GROUP_POST,
   COMPOSE_SUGGESTIONS_CLEAR,
   COMPOSE_SUGGESTIONS_READY,
   COMPOSE_SUGGESTION_SELECT,
@@ -759,7 +936,6 @@ export {
   COMPOSE_SPOILER_TEXT_CHANGE,
   COMPOSE_VISIBILITY_CHANGE,
   COMPOSE_LISTABILITY_CHANGE,
-  COMPOSE_COMPOSING_CHANGE,
   COMPOSE_EMOJI_INSERT,
   COMPOSE_UPLOAD_CHANGE_REQUEST,
   COMPOSE_UPLOAD_CHANGE_SUCCESS,
@@ -776,6 +952,7 @@ export {
   COMPOSE_ADD_TO_MENTIONS,
   COMPOSE_REMOVE_FROM_MENTIONS,
   COMPOSE_SET_STATUS,
+  COMPOSE_SET_GROUP_TIMELINE_VISIBLE,
   setComposeToStatus,
   changeCompose,
   replyCompose,
@@ -801,6 +978,9 @@ export {
   uploadComposeSuccess,
   uploadComposeFail,
   undoUploadCompose,
+  groupCompose,
+  groupComposeModal,
+  setGroupTimelineVisible,
   clearComposeSuggestions,
   fetchComposeSuggestions,
   readyComposeSuggestionsEmojis,
@@ -826,4 +1006,5 @@ export {
   addToMentions,
   removeFromMentions,
   eventDiscussionCompose,
+  type ComposeAction,
 };

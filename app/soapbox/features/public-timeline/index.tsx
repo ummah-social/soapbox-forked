@@ -3,11 +3,11 @@ import { defineMessages, FormattedMessage, useIntl } from 'react-intl';
 import { Link } from 'react-router-dom';
 
 import { changeSetting } from 'soapbox/actions/settings';
-import { connectPublicStream } from 'soapbox/actions/streaming';
 import { expandPublicTimeline } from 'soapbox/actions/timelines';
+import { usePublicStream } from 'soapbox/api/hooks';
 import PullToRefresh from 'soapbox/components/pull-to-refresh';
 import { Accordion, Column } from 'soapbox/components/ui';
-import { useAppDispatch, useInstance, useSettings } from 'soapbox/hooks';
+import { useAppSelector, useAppDispatch, useInstance, useSettings } from 'soapbox/hooks';
 
 import PinnedHostsPicker from '../remote-timeline/components/pinned-hosts-picker';
 import Timeline from '../ui/components/timeline';
@@ -23,16 +23,13 @@ const CommunityTimeline = () => {
 
   const instance = useInstance();
   const settings = useSettings();
-  const onlyMedia = settings.getIn(['public', 'other', 'onlyMedia']);
+  const onlyMedia = !!settings.getIn(['public', 'other', 'onlyMedia'], false);
+  const next = useAppSelector(state => state.timelines.get('public')?.next);
 
   const timelineId = 'public';
 
   const explanationBoxExpanded = settings.get('explanationBox');
   const showExplanationBox = settings.get('showExplanationBox');
-
-  const explanationBoxMenu = () => {
-    return [{ text: intl.formatMessage(messages.dismiss), action: dismissExplanationBox }];
-  };
 
   const dismissExplanationBox = () => {
     dispatch(changeSetting(['showExplanationBox'], false));
@@ -43,20 +40,17 @@ const CommunityTimeline = () => {
   };
 
   const handleLoadMore = (maxId: string) => {
-    dispatch(expandPublicTimeline({ maxId, onlyMedia }));
+    dispatch(expandPublicTimeline({ url: next, maxId, onlyMedia }));
   };
 
   const handleRefresh = () => {
-    return dispatch(expandPublicTimeline({ onlyMedia } as any));
+    return dispatch(expandPublicTimeline({ onlyMedia }));
   };
 
-  useEffect(() => {
-    dispatch(expandPublicTimeline({ onlyMedia } as any));
-    const disconnect = dispatch(connectPublicStream({ onlyMedia }));
+  usePublicStream({ onlyMedia });
 
-    return () => {
-      disconnect();
-    };
+  useEffect(() => {
+    dispatch(expandPublicTimeline({ onlyMedia }));
   }, [onlyMedia]);
 
   return (
@@ -66,7 +60,9 @@ const CommunityTimeline = () => {
       {showExplanationBox && <div className='mb-4'>
         <Accordion
           headline={<FormattedMessage id='fediverse_tab.explanation_box.title' defaultMessage='What is the Fediverse?' />}
-          menu={explanationBoxMenu()}
+          action={dismissExplanationBox}
+          actionIcon={require('@tabler/icons/x.svg')}
+          actionLabel={intl.formatMessage(messages.dismiss)}
           expanded={explanationBoxExpanded}
           onToggle={toggleExplanationBox}
         >

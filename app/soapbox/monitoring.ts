@@ -4,8 +4,8 @@ import type { CaptureContext } from '@sentry/types';
 
 export const start = (): void => {
   Promise.all([
-    import(/* webpackChunkName: "error" */'@sentry/react'),
-    import(/* webpackChunkName: "error" */'@sentry/tracing'),
+    import('@sentry/react'),
+    import('@sentry/tracing'),
   ]).then(([Sentry, { Integrations: Integrations }]) => {
     Sentry.init({
       dsn: BuildConfig.SENTRY_DSN,
@@ -22,6 +22,9 @@ export const start = (): void => {
         'Failed to update a ServiceWorker for scope',
         // Useful for try/catch, useless as a Sentry error.
         'AbortError',
+        // localForage error in FireFox private browsing mode (which doesn't support IndexedDB).
+        // We only use IndexedDB as a cache, so we can safely ignore the error.
+        'No available storage method found',
       ],
       denyUrls: [
         // Browser extensions.
@@ -38,7 +41,7 @@ export const start = (): void => {
 };
 
 export const captureException = (exception: any, captureContext?: CaptureContext | undefined): void => {
-  import(/* webpackChunkName: "error" */'@sentry/react')
+  import('@sentry/react')
     .then(Sentry => {
       Sentry.captureException(exception, captureContext);
     })

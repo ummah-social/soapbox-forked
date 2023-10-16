@@ -2,27 +2,25 @@ import React from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { Link } from 'react-router-dom';
 
+import { useAccount } from 'soapbox/api/hooks';
 import StillImage from 'soapbox/components/still-image';
 import { Avatar, HStack, Stack, Text } from 'soapbox/components/ui';
 import VerificationBadge from 'soapbox/components/verification-badge';
 import { useAppSelector } from 'soapbox/hooks';
-import { makeGetAccount } from 'soapbox/selectors';
 import { getAcct } from 'soapbox/utils/accounts';
 import { shortNumberFormat } from 'soapbox/utils/numbers';
 import { displayFqn } from 'soapbox/utils/state';
 
-const getAccount = makeGetAccount();
-
 interface IUserPanel {
-  accountId: string,
-  action?: JSX.Element,
-  badges?: JSX.Element[],
-  domain?: string,
+  accountId: string
+  action?: JSX.Element
+  badges?: JSX.Element[]
+  domain?: string
 }
 
 const UserPanel: React.FC<IUserPanel> = ({ accountId, action, badges, domain }) => {
   const intl = useIntl();
-  const account = useAppSelector((state) => getAccount(state, accountId));
+  const { account } = useAccount(accountId);
   const fqn = useAppSelector((state) => displayFqn(state));
 
   if (!account) return null;
@@ -35,7 +33,7 @@ const UserPanel: React.FC<IUserPanel> = ({ accountId, action, badges, domain }) 
     <div className='relative'>
       <Stack space={2}>
         <Stack>
-          <div className='-mt-4 -mx-4 h-24 bg-gray-200 relative overflow-hidden'>
+          <div className='relative -mx-4 -mt-4 h-24 overflow-hidden bg-gray-200'>
             {header && (
               <StillImage src={account.header} />
             )}
@@ -47,7 +45,7 @@ const UserPanel: React.FC<IUserPanel> = ({ accountId, action, badges, domain }) 
               title={acct}
               className='-mt-12 block'
             >
-              <Avatar src={account.avatar} size={80} className='h-20 w-20 bg-gray-50 ring-2 ring-white overflow-hidden' />
+              <Avatar src={account.avatar} size={80} className='h-20 w-20 overflow-hidden bg-gray-50 ring-2 ring-white' />
             </Link>
 
             {action && (
@@ -59,7 +57,7 @@ const UserPanel: React.FC<IUserPanel> = ({ accountId, action, badges, domain }) 
         <Stack>
           <Link to={`/@${account.acct}`}>
             <HStack space={1} alignItems='center'>
-              <Text size='lg' weight='bold' dangerouslySetInnerHTML={displayNameHtml} />
+              <Text size='lg' weight='bold' dangerouslySetInnerHTML={displayNameHtml} truncate />
 
               {verified && <VerificationBadge />}
 
@@ -71,7 +69,7 @@ const UserPanel: React.FC<IUserPanel> = ({ accountId, action, badges, domain }) 
             </HStack>
           </Link>
 
-          <Text size='sm' theme='muted'>
+          <Text size='sm' theme='muted' truncate>
             @{getAcct(account, fqn)}
           </Text>
         </Stack>

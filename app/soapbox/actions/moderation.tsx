@@ -7,6 +7,7 @@ import { openModal } from 'soapbox/actions/modals';
 import OutlineBox from 'soapbox/components/outline-box';
 import { Stack, Text } from 'soapbox/components/ui';
 import AccountContainer from 'soapbox/containers/account-container';
+import { selectAccount } from 'soapbox/selectors';
 import toast from 'soapbox/toast';
 import { isLocal } from 'soapbox/utils/accounts';
 
@@ -42,13 +43,13 @@ const messages = defineMessages({
 const deactivateUserModal = (intl: IntlShape, accountId: string, afterConfirm = () => {}) =>
   (dispatch: AppDispatch, getState: () => RootState) => {
     const state = getState();
-    const acct = state.accounts.get(accountId)!.acct;
-    const name = state.accounts.get(accountId)!.username;
+    const acct = selectAccount(state, accountId)!.acct;
+    const name = selectAccount(state, accountId)!.username;
 
     const message = (
       <Stack space={4}>
         <OutlineBox>
-          <AccountContainer id={accountId} />
+          <AccountContainer id={accountId} hideActions />
         </OutlineBox>
 
         <Text>
@@ -75,7 +76,7 @@ const deactivateUserModal = (intl: IntlShape, accountId: string, afterConfirm = 
 const deleteUserModal = (intl: IntlShape, accountId: string, afterConfirm = () => {}) =>
   (dispatch: AppDispatch, getState: () => RootState) => {
     const state = getState();
-    const account = state.accounts.get(accountId)!;
+    const account = selectAccount(state, accountId)!;
     const acct = account.acct;
     const name = account.username;
     const local = isLocal(account);
@@ -83,7 +84,7 @@ const deleteUserModal = (intl: IntlShape, accountId: string, afterConfirm = () =
     const message = (
       <Stack space={4}>
         <OutlineBox>
-          <AccountContainer id={accountId} />
+          <AccountContainer id={accountId} hideActions />
         </OutlineBox>
 
         <Text>
@@ -112,32 +113,10 @@ const deleteUserModal = (intl: IntlShape, accountId: string, afterConfirm = () =
     }));
   };
 
-const rejectUserModal = (intl: IntlShape, accountId: string, afterConfirm = () => {}) =>
-  (dispatch: AppDispatch, getState: () => RootState) => {
-    const state = getState();
-    const acct = state.accounts.get(accountId)!.acct;
-    const name = state.accounts.get(accountId)!.username;
-
-    dispatch(openModal('CONFIRM', {
-      icon: require('@tabler/icons/user-off.svg'),
-      heading: intl.formatMessage(messages.rejectUserHeading, { acct }),
-      message: intl.formatMessage(messages.rejectUserPrompt, { acct }),
-      confirm: intl.formatMessage(messages.rejectUserConfirm, { name }),
-      onConfirm: () => {
-        dispatch(deleteUsers([accountId]))
-          .then(() => {
-            afterConfirm();
-          })
-          .catch(() => {});
-      },
-    }));
-  };
-
 const toggleStatusSensitivityModal = (intl: IntlShape, statusId: string, sensitive: boolean, afterConfirm = () => {}) =>
   (dispatch: AppDispatch, getState: () => RootState) => {
     const state = getState();
-    const accountId = state.statuses.get(statusId)!.account;
-    const acct = state.accounts.get(accountId)!.acct;
+    const acct = state.statuses.get(statusId)!.account.acct;
 
     dispatch(openModal('CONFIRM', {
       icon: require('@tabler/icons/alert-triangle.svg'),
@@ -157,13 +136,12 @@ const toggleStatusSensitivityModal = (intl: IntlShape, statusId: string, sensiti
 const deleteStatusModal = (intl: IntlShape, statusId: string, afterConfirm = () => {}) =>
   (dispatch: AppDispatch, getState: () => RootState) => {
     const state = getState();
-    const accountId = state.statuses.get(statusId)!.account;
-    const acct = state.accounts.get(accountId)!.acct;
+    const acct = state.statuses.get(statusId)!.account.acct;
 
     dispatch(openModal('CONFIRM', {
       icon: require('@tabler/icons/trash.svg'),
       heading: intl.formatMessage(messages.deleteStatusHeading),
-      message: intl.formatMessage(messages.deleteStatusPrompt, { acct }),
+      message: intl.formatMessage(messages.deleteStatusPrompt, { acct: <strong className='break-words'>{acct}</strong> }),
       confirm: intl.formatMessage(messages.deleteStatusConfirm),
       onConfirm: () => {
         dispatch(deleteStatus(statusId)).then(() => {
@@ -178,7 +156,6 @@ const deleteStatusModal = (intl: IntlShape, statusId: string, afterConfirm = () 
 export {
   deactivateUserModal,
   deleteUserModal,
-  rejectUserModal,
   toggleStatusSensitivityModal,
   deleteStatusModal,
 };

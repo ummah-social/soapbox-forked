@@ -1,5 +1,4 @@
 import React, { useCallback } from 'react';
-import { HotKeys } from 'react-hotkeys';
 import { defineMessages, useIntl, FormattedMessage, IntlShape, MessageDescriptor, defineMessage } from 'react-intl';
 import { Link, useHistory } from 'react-router-dom';
 
@@ -12,6 +11,7 @@ import Icon from 'soapbox/components/icon';
 import { HStack, Text, Emoji } from 'soapbox/components/ui';
 import AccountContainer from 'soapbox/containers/account-container';
 import StatusContainer from 'soapbox/containers/status-container';
+import { HotKeys } from 'soapbox/features/ui/components/hotkeys';
 import { useAppDispatch, useAppSelector, useInstance } from 'soapbox/hooks';
 import { makeGetNotification } from 'soapbox/selectors';
 import { NotificationType, validType } from 'soapbox/utils/notification';
@@ -30,7 +30,7 @@ const notificationForScreenReader = (intl: IntlShape, message: string, timestamp
 const buildLink = (account: AccountEntity): JSX.Element => (
   <bdi>
     <Link
-      className='text-gray-800 dark:text-gray-200 font-bold hover:underline'
+      className='font-bold text-gray-800 hover:underline dark:text-gray-200'
       title={account.acct}
       to={`/@${account.acct}`}
       dangerouslySetInnerHTML={{ __html: account.display_name_html }}
@@ -43,7 +43,9 @@ const icons: Record<NotificationType, string> = {
   follow_request: require('@tabler/icons/user-plus.svg'),
   mention: require('@tabler/icons/at.svg'),
   favourite: require('@tabler/icons/heart.svg'),
+  group_favourite: require('@tabler/icons/heart.svg'),
   reblog: require('@tabler/icons/repeat.svg'),
+  group_reblog: require('@tabler/icons/repeat.svg'),
   status: require('@tabler/icons/bell-ringing.svg'),
   poll: require('@tabler/icons/chart-bar.svg'),
   move: require('@tabler/icons/briefcase.svg'),
@@ -78,9 +80,17 @@ const messages: Record<NotificationType, MessageDescriptor> = defineMessages({
     id: 'notification.favourite',
     defaultMessage: '{name} liked your post',
   },
+  group_favourite: {
+    id: 'notification.group_favourite',
+    defaultMessage: '{name} liked your group post',
+  },
   reblog: {
     id: 'notification.reblog',
     defaultMessage: '{name} reposted your post',
+  },
+  group_reblog: {
+    id: 'notification.group_reblog',
+    defaultMessage: '{name} reposted your group post',
   },
   status: {
     id: 'notification.status',
@@ -154,13 +164,13 @@ const buildMessage = (
 const avatarSize = 48;
 
 interface INotificaton {
-  hidden?: boolean,
-  notification: NotificationEntity,
-  onMoveUp?: (notificationId: string) => void,
-  onMoveDown?: (notificationId: string) => void,
-  onReblog?: (status: StatusEntity, e?: KeyboardEvent) => void,
-  getScrollPosition?: () => ScrollPosition | undefined,
-  updateScrollBottom?: (bottom: number) => void,
+  hidden?: boolean
+  notification: NotificationEntity
+  onMoveUp?: (notificationId: string) => void
+  onMoveDown?: (notificationId: string) => void
+  onReblog?: (status: StatusEntity, e?: KeyboardEvent) => void
+  getScrollPosition?: () => ScrollPosition | undefined
+  updateScrollBottom?: (bottom: number) => void
 }
 
 const Notification: React.FC<INotificaton> = (props) => {
@@ -269,14 +279,15 @@ const Notification: React.FC<INotificaton> = (props) => {
       return (
         <Emoji
           emoji={notification.emoji}
-          className='w-4 h-4 flex-none'
+          src={notification.emoji_url || undefined}
+          className='h-4 w-4 flex-none'
         />
       );
     } else if (validType(type)) {
       return (
         <Icon
           src={icons[type]}
-          className='text-primary-600 dark:text-primary-400 flex-none'
+          className='flex-none text-primary-600 dark:text-primary-400'
         />
       );
     } else {
@@ -293,6 +304,7 @@ const Notification: React.FC<INotificaton> = (props) => {
             id={account.id}
             hidden={hidden}
             avatarSize={avatarSize}
+            withRelationship
           />
         ) : null;
       case 'follow_request':
@@ -302,6 +314,7 @@ const Notification: React.FC<INotificaton> = (props) => {
             hidden={hidden}
             avatarSize={avatarSize}
             actionType='follow_request'
+            withRelationship
           />
         ) : null;
       case 'move':
@@ -310,11 +323,14 @@ const Notification: React.FC<INotificaton> = (props) => {
             id={notification.target.id}
             hidden={hidden}
             avatarSize={avatarSize}
+            withRelationship
           />
         ) : null;
       case 'favourite':
+      case 'group_favourite':
       case 'mention':
       case 'reblog':
+      case 'group_reblog':
       case 'status':
       case 'poll':
       case 'update':
@@ -325,11 +341,12 @@ const Notification: React.FC<INotificaton> = (props) => {
         return status && typeof status === 'object' ? (
           <StatusContainer
             id={status.id}
-            withDismiss
             hidden={hidden}
             onMoveDown={handleMoveDown}
             onMoveUp={handleMoveUp}
             avatarSize={avatarSize}
+            contextType='notifications'
+            showGroup={false}
           />
         ) : null;
       default:
@@ -359,7 +376,7 @@ const Notification: React.FC<INotificaton> = (props) => {
         tabIndex={0}
         aria-label={ariaLabel}
       >
-        <div className='p-4 focusable'>
+        <div className='focusable p-4'>
           <div className='mb-2'>
             <HStack alignItems='center' space={3}>
               <div

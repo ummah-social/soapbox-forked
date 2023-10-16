@@ -1,28 +1,25 @@
-import classNames from 'clsx';
+import clsx from 'clsx';
 import { List as ImmutableList } from 'immutable';
 import React from 'react';
 import { FormattedMessage } from 'react-intl';
-import { useDispatch } from 'react-redux';
-import { useHistory } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 import { openModal } from 'soapbox/actions/modals';
 import { HStack, Text, Emoji } from 'soapbox/components/ui';
-import { useAppSelector, useSoapboxConfig, useFeatures } from 'soapbox/hooks';
+import { useAppSelector, useSoapboxConfig, useFeatures, useAppDispatch } from 'soapbox/hooks';
 import { reduceEmoji } from 'soapbox/utils/emoji-reacts';
 import { shortNumberFormat } from 'soapbox/utils/numbers';
 
 import type { Status } from 'soapbox/types/entities';
 
 interface IStatusInteractionBar {
-  status: Status,
+  status: Status
 }
 
 const StatusInteractionBar: React.FC<IStatusInteractionBar> = ({ status }): JSX.Element | null => {
-  const history = useHistory();
-
   const me = useAppSelector(({ me }) => me);
   const { allowedEmoji } = useSoapboxConfig();
-  const dispatch = useDispatch();
+  const dispatch = useAppDispatch();
   const features = useFeatures();
   const { account } = status;
 
@@ -41,6 +38,13 @@ const StatusInteractionBar: React.FC<IStatusInteractionBar> = ({ status }): JSX.
 
   const onOpenFavouritesModal = (username: string, statusId: string): void => {
     dispatch(openModal('FAVOURITES', {
+      username,
+      statusId,
+    }));
+  };
+
+  const onOpenDislikesModal = (username: string, statusId: string): void => {
+    dispatch(openModal('DISLIKES', {
       username,
       statusId,
     }));
@@ -85,16 +89,10 @@ const StatusInteractionBar: React.FC<IStatusInteractionBar> = ({ status }): JSX.
     return null;
   };
 
-  const navigateToQuotes: React.EventHandler<React.MouseEvent> = (e) => {
-    e.preventDefault();
-
-    history.push(`/@${status.getIn(['account', 'acct'])}/posts/${status.id}/quotes`);
-  };
-
   const getQuotes = () => {
     if (status.quotes_count) {
       return (
-        <InteractionCounter count={status.quotes_count} onClick={navigateToQuotes}>
+        <InteractionCounter count={status.quotes_count} to={`/@${status.getIn(['account', 'acct'])}/posts/${status.id}/quotes`}>
           <FormattedMessage
             id='status.interactions.quotes'
             defaultMessage='{count, plural, one {Quote} other {Quotes}}'
@@ -114,6 +112,13 @@ const StatusInteractionBar: React.FC<IStatusInteractionBar> = ({ status }): JSX.
     else onOpenFavouritesModal(account.acct, status.id);
   };
 
+  const handleOpenDislikesModal: React.EventHandler<React.MouseEvent<HTMLButtonElement>> = (e) => {
+    e.preventDefault();
+
+    if (!me) onOpenUnauthorizedModal();
+    else onOpenDislikesModal(account.acct, status.id);
+  };
+
   const getFavourites = () => {
     if (status.favourites_count) {
       return (
@@ -122,6 +127,24 @@ const StatusInteractionBar: React.FC<IStatusInteractionBar> = ({ status }): JSX.
             id='status.interactions.favourites'
             defaultMessage='{count, plural, one {Like} other {Likes}}'
             values={{ count: status.favourites_count }}
+          />
+        </InteractionCounter>
+      );
+    }
+
+    return null;
+  };
+
+  const getDislikes = () => {
+    const dislikesCount = status.dislikes_count;
+
+    if (dislikesCount) {
+      return (
+        <InteractionCounter count={status.favourites_count} onClick={features.exposableReactions ? handleOpenDislikesModal : undefined}>
+          <FormattedMessage
+            id='status.interactions.dislikes'
+            defaultMessage='{count, plural, one {Dislike} other {Dislikes}}'
+            values={{ count: dislikesCount }}
           />
         </InteractionCounter>
       );
@@ -152,8 +175,9 @@ const StatusInteractionBar: React.FC<IStatusInteractionBar> = ({ status }): JSX.
               return (
                 <Emoji
                   key={i}
-                  className='w-4.5 h-4.5 flex-none'
+                  className='h-4.5 w-4.5 flex-none'
                   emoji={e.get('name')}
+                  src={e.get('url')}
                 />
               );
             })}
@@ -170,40 +194,54 @@ const StatusInteractionBar: React.FC<IStatusInteractionBar> = ({ status }): JSX.
       {getReposts()}
       {getQuotes()}
       {features.emojiReacts ? getEmojiReacts() : getFavourites()}
+      {getDislikes()}
     </HStack>
   );
 };
 
 interface IInteractionCounter {
-  count: number,
-  onClick?: React.MouseEventHandler<HTMLButtonElement>,
-  children: React.ReactNode,
+  count: number
+  children: React.ReactNode
+  onClick?: React.MouseEventHandler<HTMLButtonElement>
+  to?: string
 }
 
-const InteractionCounter: React.FC<IInteractionCounter> = ({ count, onClick, children }) => {
+const InteractionCounter: React.FC<IInteractionCounter> = ({ count, children, onClick, to }) => {
   const features = useFeatures();
+
+  const className = clsx({
+    'text-gray-600 dark:text-gray-700': true,
+    'hover:underline': features.exposableReactions,
+    'cursor-default': !features.exposableReactions,
+  });
+
+  const body = (
+    <HStack space={1} alignItems='center'>
+      <Text weight='bold'>
+        {shortNumberFormat(count)}
+      </Text>
+
+      <Text tag='div' theme='muted'>
+        {children}
+      </Text>
+    </HStack>
+  );
+
+  if (to) {
+    return (
+      <Link to={to} className={className}>
+        {body}
+      </Link>
+    );
+  }
 
   return (
     <button
       type='button'
       onClick={onClick}
-      className={
-        classNames({
-          'text-gray-600 dark:text-gray-700': true,
-          'hover:underline': features.exposableReactions,
-          'cursor-default': !features.exposableReactions,
-        })
-      }
+      className={className}
     >
-      <HStack space={1} alignItems='center'>
-        <Text theme='primary' weight='bold'>
-          {shortNumberFormat(count)}
-        </Text>
-
-        <Text tag='div' theme='muted'>
-          {children}
-        </Text>
-      </HStack>
+      {body}
     </button>
   );
 };

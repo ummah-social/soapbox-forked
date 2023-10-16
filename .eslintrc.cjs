@@ -5,6 +5,7 @@ module.exports = {
     'eslint:recommended',
     'plugin:import/typescript',
     'plugin:compat/recommended',
+    'plugin:tailwindcss/recommended',
   ],
 
   env: {
@@ -17,8 +18,6 @@ module.exports = {
   globals: {
     ATTACHMENT_HOST: false,
   },
-
-  parser: '@babel/eslint-parser',
 
   plugins: [
     'react',
@@ -55,12 +54,16 @@ module.exports = {
     },
     polyfills: [
       'es:all', // core-js
+      'fetch', // not polyfilled, but ignore it
       'IntersectionObserver', // npm:intersection-observer
       'Promise', // core-js
       'ResizeObserver', // npm:resize-observer-polyfill
       'URL', // core-js
       'URLSearchParams', // core-js
     ],
+    tailwindcss: {
+      config: 'tailwind.config.cjs',
+    },
   },
 
   rules: {
@@ -74,6 +77,7 @@ module.exports = {
       },
     ],
     'comma-style': ['warn', 'last'],
+    'import/no-duplicates': 'error',
     'space-before-function-paren': ['error', 'never'],
     'space-infix-ops': 'error',
     'space-in-parens': ['error', 'never'],
@@ -235,18 +239,7 @@ module.exports = {
       },
     ],
     'import/newline-after-import': 'error',
-    'import/no-extraneous-dependencies': [
-      'error',
-      // {
-      //   devDependencies: [
-      //     'webpack/**',
-      //     'app/soapbox/test_setup.js',
-      //     'app/soapbox/test_helpers.js',
-      //     'app/**/__tests__/**',
-      //     'app/**/__mocks__/**',
-      //   ],
-      // },
-    ],
+    'import/no-extraneous-dependencies': 'error',
     'import/no-unresolved': 'error',
     'import/no-webpack-loader-syntax': 'error',
     'import/order': [
@@ -266,11 +259,30 @@ module.exports = {
         alphabetize: { order: 'asc' },
       },
     ],
-    '@typescript-eslint/no-duplicate-imports': 'error',
+    '@typescript-eslint/member-delimiter-style': [
+      'error',
+      {
+        multiline: {
+          delimiter: 'none',
+        },
+        singleline: {
+          delimiter: 'comma',
+        },
+      },
+    ],
 
     'promise/catch-or-return': 'error',
 
     'react-hooks/rules-of-hooks': 'error',
+
+    'tailwindcss/classnames-order': [
+      'error',
+      {
+        classRegex: '^(base|container|icon|item|list|outer|wrapper)?[c|C]lass(Name)?$',
+        config: 'tailwind.config.cjs',
+      },
+    ],
+    'tailwindcss/migration-from-tailwind-2': 'error',
   },
   overrides: [
     {

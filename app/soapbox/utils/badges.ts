@@ -11,9 +11,9 @@ const badgeToTag = (badge: string) => badge.replace(/^badge:/, '');
 /** Difference between an old and new set of tags. */
 interface TagDiff {
   /** New tags that were added. */
-  added: string[],
+  added: string[]
   /** Old tags that were removed. */
-  removed: string[],
+  removed: string[]
 }
 
 /** Returns the differences between two sets of tags. */
@@ -33,8 +33,8 @@ const filterBadges = (tags: string[]): string[] => {
 };
 
 /** Get badges from an account. */
-const getBadges = (account: Account) => {
-  const tags = Array.from(account?.getIn(['pleroma', 'tags']) as Iterable<string> || []);
+const getBadges = (account: Pick<Account, 'pleroma'>) => {
+  const tags = account?.pleroma?.tags ?? [];
   return filterBadges(tags);
 };
 

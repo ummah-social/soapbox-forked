@@ -2,8 +2,6 @@ import React from 'react';
 import { defineMessages, useIntl } from 'react-intl';
 
 import {
-  followAccount,
-  unfollowAccount,
   blockAccount,
   unblockAccount,
   muteAccount,
@@ -12,10 +10,11 @@ import {
   rejectFollowRequest,
 } from 'soapbox/actions/accounts';
 import { openModal } from 'soapbox/actions/modals';
+import { useFollow } from 'soapbox/api/hooks';
 import { Button, HStack } from 'soapbox/components/ui';
-import { useAppDispatch, useAppSelector, useFeatures } from 'soapbox/hooks';
+import { useAppDispatch, useFeatures, useLoggedIn } from 'soapbox/hooks';
 
-import type { Account as AccountEntity } from 'soapbox/types/entities';
+import type { Account } from 'soapbox/schemas';
 
 const messages = defineMessages({
   block: { id: 'account.block', defaultMessage: 'Block @{name}' },
@@ -35,7 +34,7 @@ const messages = defineMessages({
 
 interface IActionButton {
   /** Target account for the action. */
-  account: AccountEntity
+  account: Account
   /** Type of action to prioritize, eg on Blocks and Mutes pages. */
   actionType?: 'muting' | 'blocking' | 'follow_request'
   /** Displays shorter text on the "Awaiting approval" button. */
@@ -52,13 +51,14 @@ const ActionButton: React.FC<IActionButton> = ({ account, actionType, small }) =
   const features = useFeatures();
   const intl = useIntl();
 
-  const me = useAppSelector((state) => state.me);
+  const { isLoggedIn, me } = useLoggedIn();
+  const { follow, unfollow } = useFollow();
 
   const handleFollow = () => {
     if (account.relationship?.following || account.relationship?.requested) {
-      dispatch(unfollowAccount(account.id));
+      unfollow(account.id);
     } else {
-      dispatch(followAccount(account.id));
+      follow(account.id);
     }
   };
 
@@ -156,6 +156,7 @@ const ActionButton: React.FC<IActionButton> = ({ account, actionType, small }) =
           onClick={handleRemoteFollow}
           icon={require('@tabler/icons/plus.svg')}
           text={intl.formatMessage(messages.follow)}
+          size='sm'
         />
       );
       // Pleroma's classic remote follow form.
@@ -164,7 +165,11 @@ const ActionButton: React.FC<IActionButton> = ({ account, actionType, small }) =
         <form method='POST' action='/main/ostatus'>
           <input type='hidden' name='nickname' value={account.acct} />
           <input type='hidden' name='profile' value='' />
-          <Button text={intl.formatMessage(messages.remote_follow)} type='submit' />
+          <Button
+            text={intl.formatMessage(messages.remote_follow)}
+            type='submit'
+            size='sm'
+          />
         </form>
       );
     }
@@ -181,7 +186,7 @@ const ActionButton: React.FC<IActionButton> = ({ account, actionType, small }) =
     return null;
   };
 
-  if (!me) {
+  if (!isLoggedIn) {
     return renderLoggedOut();
   }
 

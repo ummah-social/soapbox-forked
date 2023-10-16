@@ -1,4 +1,4 @@
-import classNames from 'clsx';
+import clsx from 'clsx';
 import React from 'react';
 import { defineMessages, useIntl, FormatDateOptions } from 'react-intl';
 
@@ -7,7 +7,7 @@ import { HStack, Icon } from 'soapbox/components/ui';
 import BundleContainer from 'soapbox/features/ui/containers/bundle-container';
 import { CryptoAddress } from 'soapbox/features/ui/util/async-components';
 
-import type { Field } from 'soapbox/types/entities';
+import type { Account } from 'soapbox/schemas';
 
 const getTicker = (value: string): string => (value.match(/\$([a-zA-Z]*)/i) || [])[1];
 const isTicker = (value: string): boolean => Boolean(getTicker(value));
@@ -26,7 +26,7 @@ const dateFormatOptions: FormatDateOptions = {
 };
 
 interface IProfileField {
-  field: Field,
+  field: Account['fields'][number]
 }
 
 /** Renders a single profile field. */
@@ -53,7 +53,7 @@ const ProfileField: React.FC<IProfileField> = ({ field }) => {
       </dt>
 
       <dd
-        className={classNames({ 'text-success-500': field.verified_at })}
+        className={clsx({ 'text-success-500': field.verified_at })}
         title={field.value_plain}
       >
         <HStack space={2} alignItems='center'>
@@ -63,7 +63,7 @@ const ProfileField: React.FC<IProfileField> = ({ field }) => {
             </span>
           )}
 
-          <Markup className='break-words overflow-hidden' tag='span' dangerouslySetInnerHTML={{ __html: field.value_emojified }} />
+          <Markup className='overflow-hidden break-words' tag='span' dangerouslySetInnerHTML={{ __html: field.value_emojified }} />
         </HStack>
       </dd>
     </dl>

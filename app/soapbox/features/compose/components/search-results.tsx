@@ -1,9 +1,10 @@
-import classNames from 'clsx';
+import clsx from 'clsx';
 import React, { useEffect, useRef } from 'react';
 import { FormattedMessage, defineMessages, useIntl } from 'react-intl';
 
 import { expandSearch, setFilter, setSearchAccount } from 'soapbox/actions/search';
 import { fetchTrendingStatuses } from 'soapbox/actions/trending-statuses';
+import { useAccount } from 'soapbox/api/hooks';
 import Hashtag from 'soapbox/components/hashtag';
 import IconButton from 'soapbox/components/icon-button';
 import ScrollableList from 'soapbox/components/scrollable-list';
@@ -38,8 +39,8 @@ const SearchResults = () => {
   const trends = useAppSelector((state) => state.trends.items);
   const submitted = useAppSelector((state) => state.search.submitted);
   const selectedFilter = useAppSelector((state) => state.search.filter);
-  const filterByAccount = useAppSelector((state) => state.search.accountId);
-  const account = useAppSelector((state) => state.accounts.get(filterByAccount)?.acct);
+  const filterByAccount = useAppSelector((state) => state.search.accountId || undefined);
+  const { account } = useAccount(filterByAccount);
 
   const handleLoadMore = () => dispatch(expandSearch(selectedFilter));
 
@@ -48,7 +49,8 @@ const SearchResults = () => {
   const selectFilter = (newActiveFilter: SearchFilter) => dispatch(setFilter(newActiveFilter));
 
   const renderFilterBar = () => {
-    const items = [
+    const items = [];
+    items.push(
       {
         text: intl.formatMessage(messages.accounts),
         action: () => selectFilter('accounts'),
@@ -59,12 +61,15 @@ const SearchResults = () => {
         action: () => selectFilter('statuses'),
         name: 'statuses',
       },
+    );
+
+    items.push(
       {
         text: intl.formatMessage(messages.hashtags),
         action: () => selectFilter('hashtags'),
         name: 'hashtags',
       },
-    ];
+    );
 
     return <Tabs items={items} activeItem={selectedFilter} />;
   };
@@ -195,13 +200,13 @@ const SearchResults = () => {
   return (
     <>
       {filterByAccount ? (
-        <HStack className='mb-4 pb-4 px-2 border-solid border-b border-gray-200 dark:border-gray-800' space={2}>
+        <HStack className='mb-4 border-b border-solid border-gray-200 px-2 pb-4 dark:border-gray-800' space={2}>
           <IconButton iconClassName='h-5 w-5' src={require('@tabler/icons/x.svg')} onClick={handleUnsetAccount} />
-          <Text>
+          <Text truncate>
             <FormattedMessage
               id='search_results.filter_message'
               defaultMessage='You are searching for posts from @{acct}.'
-              values={{ acct: account }}
+              values={{ acct: <strong className='break-words'>{account?.acct}</strong> }}
             />
           </Text>
         </HStack>
@@ -219,10 +224,10 @@ const SearchResults = () => {
           onLoadMore={handleLoadMore}
           placeholderComponent={placeholderComponent}
           placeholderCount={20}
-          className={classNames({
+          className={clsx({
             'divide-gray-200 dark:divide-gray-800 divide-solid divide-y': selectedFilter === 'statuses',
           })}
-          itemClassName={classNames({
+          itemClassName={clsx({
             'pb-4': selectedFilter === 'accounts',
             'pb-3': selectedFilter === 'hashtags',
           })}

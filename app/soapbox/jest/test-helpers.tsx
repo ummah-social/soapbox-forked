@@ -10,7 +10,6 @@ import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import { Action, applyMiddleware, createStore } from 'redux';
 import thunk from 'redux-thunk';
-import '@testing-library/jest-dom';
 
 import { ChatProvider } from 'soapbox/contexts/chat-context';
 import { StatProvider } from 'soapbox/contexts/stat-context';
@@ -51,21 +50,23 @@ const TestApp: FC<any> = ({ children, storeProps, routerProps = {} }) => {
   };
 
   return (
-    <Provider store={props.store}>
-      <MemoryRouter {...routerProps}>
-        <StatProvider>
-          <QueryClientProvider client={queryClient}>
-            <ChatProvider>
-              <IntlProvider locale={props.locale}>
-                {children}
+    <div id='soapbox'>
+      <Provider store={props.store}>
+        <MemoryRouter {...routerProps}>
+          <StatProvider>
+            <QueryClientProvider client={queryClient}>
+              <ChatProvider>
+                <IntlProvider locale={props.locale}>
+                  {children}
 
-                <Toaster />
-              </IntlProvider>
-            </ChatProvider>
-          </QueryClientProvider>
-        </StatProvider>
-      </MemoryRouter>
-    </Provider>
+                  <Toaster />
+                </IntlProvider>
+              </ChatProvider>
+            </QueryClientProvider>
+          </StatProvider>
+        </MemoryRouter>
+      </Provider>
+    </div>
   );
 };
 

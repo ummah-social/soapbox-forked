@@ -4,8 +4,8 @@ import { useParams } from 'react-router-dom';
 
 import { fetchList } from 'soapbox/actions/lists';
 import { openModal } from 'soapbox/actions/modals';
-import { connectListStream } from 'soapbox/actions/streaming';
 import { expandListTimeline } from 'soapbox/actions/timelines';
+import { useListStream } from 'soapbox/api/hooks';
 import MissingIndicator from 'soapbox/components/missing-indicator';
 import { Column, Button, Spinner } from 'soapbox/components/ui';
 import { useAppDispatch, useAppSelector } from 'soapbox/hooks';
@@ -17,20 +17,17 @@ const ListTimeline: React.FC = () => {
   const { id } = useParams<{ id: string }>();
 
   const list = useAppSelector((state) => state.lists.get(id));
+  const next = useAppSelector(state => state.timelines.get(`list:${id}`)?.next);
+
+  useListStream(id);
 
   useEffect(() => {
     dispatch(fetchList(id));
     dispatch(expandListTimeline(id));
-
-    const disconnect = dispatch(connectListStream(id));
-
-    return () => {
-      disconnect();
-    };
   }, [id]);
 
   const handleLoadMore = (maxId: string) => {
-    dispatch(expandListTimeline(id, { maxId }));
+    dispatch(expandListTimeline(id, { url: next, maxId }));
   };
 
   const handleEditClick = () => {

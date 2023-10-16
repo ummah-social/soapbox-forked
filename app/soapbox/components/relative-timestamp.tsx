@@ -16,7 +16,7 @@ const messages = defineMessages({
   days_remaining: { id: 'time_remaining.days', defaultMessage: '{number, plural, one {# day} other {# days}} left' },
 });
 
-const dateFormatOptions: FormatDateOptions = {
+export const dateFormatOptions: FormatDateOptions = {
   hour12: true,
   year: 'numeric',
   month: 'short',
@@ -113,14 +113,14 @@ const timeRemainingString = (intl: IntlShape, date: Date, now: number) => {
 };
 
 interface RelativeTimestampProps extends IText {
-  intl: IntlShape,
-  timestamp: string,
-  year?: number,
-  futureDate?: boolean,
+  intl: IntlShape
+  timestamp: string
+  year?: number
+  futureDate?: boolean
 }
 
 interface RelativeTimestampState {
-  now: number,
+  now: number
 }
 
 /** Displays a timestamp compared to the current time, eg "1m" for one minute ago. */

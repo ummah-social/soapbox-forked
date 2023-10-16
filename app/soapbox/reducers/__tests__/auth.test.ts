@@ -1,4 +1,4 @@
-import { Map as ImmutableMap, fromJS } from 'immutable';
+import { Map as ImmutableMap } from 'immutable';
 
 import {
   AUTH_APP_CREATED,
@@ -10,6 +10,7 @@ import {
 } from 'soapbox/actions/auth';
 import { ME_FETCH_SKIP } from 'soapbox/actions/me';
 import { MASTODON_PRELOAD_IMPORT } from 'soapbox/actions/preload';
+import { buildAccount } from 'soapbox/jest/factory';
 import { AuthAppRecord, AuthTokenRecord, AuthUserRecord, ReducerRecord } from 'soapbox/reducers/auth';
 
 import reducer from '../auth';
@@ -71,7 +72,7 @@ describe('auth reducer', () => {
     it('deletes the user', () => {
       const action = {
         type: AUTH_LOGGED_OUT,
-        account: fromJS({ url: 'https://gleasonator.com/users/alex' }),
+        account: buildAccount({ url: 'https://gleasonator.com/users/alex' }),
       };
 
       const state = ReducerRecord({
@@ -100,7 +101,7 @@ describe('auth reducer', () => {
 
       const action = {
         type: AUTH_LOGGED_OUT,
-        account: fromJS({ url: 'https://gleasonator.com/users/alex' }),
+        account: buildAccount({ url: 'https://gleasonator.com/users/alex' }),
       };
 
       const result = reducer(state, action);
@@ -299,7 +300,7 @@ describe('auth reducer', () => {
     it('sets the value of `me`', () => {
       const action = {
         type: SWITCH_ACCOUNT,
-        account: fromJS({ url: 'https://gleasonator.com/users/benis' }),
+        account: { url: 'https://gleasonator.com/users/benis' },
       };
 
       const result = reducer(undefined, action);

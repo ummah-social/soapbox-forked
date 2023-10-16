@@ -1,4 +1,4 @@
-import classNames from 'clsx';
+import clsx from 'clsx';
 import debounce from 'lodash/debounce';
 import throttle from 'lodash/throttle';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -21,23 +21,23 @@ const TICK_SIZE = 10;
 const PADDING   = 180;
 
 interface IAudio {
-  src: string,
-  alt?: string,
-  poster?: string,
-  duration?: number,
-  width?: number,
-  height?: number,
-  editable?: boolean,
-  fullscreen?: boolean,
-  cacheWidth?: (width: number) => void,
-  backgroundColor?: string,
-  foregroundColor?: string,
-  accentColor?: string,
-  currentTime?: number,
-  autoPlay?: boolean,
-  volume?: number,
-  muted?: boolean,
-  deployPictureInPicture?: (type: string, opts: Record<string, any>) => void,
+  src: string
+  alt?: string
+  poster?: string
+  duration?: number
+  width?: number
+  height?: number
+  editable?: boolean
+  fullscreen?: boolean
+  cacheWidth?: (width: number) => void
+  backgroundColor?: string
+  foregroundColor?: string
+  accentColor?: string
+  currentTime?: number
+  autoPlay?: boolean
+  volume?: number
+  muted?: boolean
+  deployPictureInPicture?: (type: string, opts: Record<string, any>) => void
 }
 
 const Audio: React.FC<IAudio> = (props) => {
@@ -297,6 +297,7 @@ const Audio: React.FC<IAudio> = (props) => {
   };
 
   const _renderCanvas = () => {
+    // eslint-disable-next-line compat/compat
     requestAnimationFrame(() => {
       if (!audio.current) return;
 
@@ -437,7 +438,7 @@ const Audio: React.FC<IAudio> = (props) => {
 
   return (
     <div
-      className={classNames('audio-player', { editable })}
+      className={clsx('audio-player', { editable })}
       ref={player}
       style={{
         backgroundColor: _getBackgroundColor(),
@@ -465,10 +466,9 @@ const Audio: React.FC<IAudio> = (props) => {
       <canvas
         role='button'
         tabIndex={0}
-        className='audio-player__canvas'
+        className='audio-player__canvas absolute left-0 top-0 w-full'
         width={width}
         height={height}
-        style={{ width: '100%', position: 'absolute', top: 0, left: 0 }}
         ref={canvas}
         onClick={togglePlay}
         onKeyDown={handleAudioKeyDown}
@@ -480,15 +480,12 @@ const Audio: React.FC<IAudio> = (props) => {
         <img
           src={poster}
           alt=''
+          className='pointer-events-none absolute aspect-1 -translate-x-1/2 -translate-y-1/2 rounded-full object-cover'
           width={(_getRadius() - TICK_SIZE) * 2}
           height={(_getRadius() - TICK_SIZE) * 2}
           style={{
-            position: 'absolute',
             left: _getCX(),
             top: _getCY(),
-            transform: 'translate(-50%, -50%)',
-            borderRadius: '50%',
-            pointerEvents: 'none',
           }}
         />
       )}
@@ -499,13 +496,13 @@ const Audio: React.FC<IAudio> = (props) => {
 
         <div
           className='video-player__seek__progress'
-          style={{ width: `${progress}%`, backgroundColor: _getAccentColor() }}
+          style={{ width: `${progress}%`, backgroundColor: accentColor }}
         />
 
         <span
-          className={classNames('video-player__seek__handle', { active: dragging })}
+          className={clsx('video-player__seek__handle', { active: dragging })}
           tabIndex={0}
-          style={{ left: `${progress}%`, backgroundColor: _getAccentColor() }}
+          style={{ left: `${progress}%`, backgroundColor: accentColor }}
           onKeyDown={handleAudioKeyDown}
         />
       </div>
@@ -535,7 +532,7 @@ const Audio: React.FC<IAudio> = (props) => {
             </button>
 
             <div
-              className={classNames('video-player__volume', { active: hovered })}
+              className={clsx('video-player__volume', { active: hovered })}
               ref={slider}
               onMouseDown={handleVolumeMouseDown}
             >

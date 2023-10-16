@@ -5,17 +5,15 @@ import Account from 'soapbox/components/account';
 import { Button, Card, CardBody, Icon, Stack, Text } from 'soapbox/components/ui';
 import { useInstance, useOwnAccount } from 'soapbox/hooks';
 
-import type { Account as AccountEntity } from 'soapbox/types/entities';
-
 const FediverseStep = ({ onNext }: { onNext: () => void }) => {
-  const account = useOwnAccount() as AccountEntity;
+  const { account } = useOwnAccount();
   const instance = useInstance();
 
   return (
     <Card variant='rounded' size='xl'>
       <CardBody>
         <Stack space={2}>
-          <Icon strokeWidth={1} src={require('@tabler/icons/affiliate.svg')} className='w-16 h-16 mx-auto text-primary-600 dark:text-primary-400' />
+          <Icon strokeWidth={1} src={require('@tabler/icons/affiliate.svg')} className='mx-auto h-16 w-16 text-primary-600 dark:text-primary-400' />
 
           <Text size='2xl' weight='bold'>
             <FormattedMessage
@@ -28,7 +26,7 @@ const FediverseStep = ({ onNext }: { onNext: () => void }) => {
           </Text>
 
           <Stack space={4}>
-            <div className='border-b border-gray-200 dark:border-gray-800 border-solid pb-2 sm:pb-5'>
+            <div className='border-b border-solid border-gray-200 pb-2 dark:border-gray-800 sm:pb-5'>
               <Stack space={4}>
                 <Text theme='muted'>
                   <FormattedMessage
@@ -49,9 +47,11 @@ const FediverseStep = ({ onNext }: { onNext: () => void }) => {
               </Stack>
             </div>
 
-            <div className='bg-primary-50 dark:bg-gray-800 rounded-lg text-center p-4'>
-              <Account account={account} />
-            </div>
+            {account && (
+              <div className='rounded-lg bg-primary-50 p-4 text-center dark:bg-gray-800'>
+                <Account account={account} />
+              </div>
+            )}
 
             <Text theme='muted'>
               <FormattedMessage
@@ -69,7 +69,7 @@ const FediverseStep = ({ onNext }: { onNext: () => void }) => {
           </Stack>
         </Stack>
 
-        <div className='pt-10 sm:w-2/3 md:w-1/2 mx-auto'>
+        <div className='mx-auto pt-10 sm:w-2/3 md:w-1/2'>
           <Stack justifyContent='center' space={2}>
             <Button
               block

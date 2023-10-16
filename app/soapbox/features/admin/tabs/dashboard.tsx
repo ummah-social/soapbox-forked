@@ -1,6 +1,5 @@
 import React from 'react';
 import { FormattedMessage } from 'react-intl';
-import { useHistory } from 'react-router-dom';
 
 import { getSubscribersCsv, getUnsubscribersCsv, getCombinedCsv } from 'soapbox/actions/email-list';
 import List, { ListItem } from 'soapbox/components/list';
@@ -15,10 +14,9 @@ import RegistrationModePicker from '../components/registration-mode-picker';
 
 const Dashboard: React.FC = () => {
   const dispatch = useAppDispatch();
-  const history = useHistory();
   const instance = useInstance();
   const features = useFeatures();
-  const account = useOwnAccount();
+  const { account } = useOwnAccount();
 
   const handleSubscribersClick: React.MouseEventHandler = e => {
     dispatch(getSubscribersCsv()).then(({ data }) => {
@@ -40,9 +38,6 @@ const Dashboard: React.FC = () => {
     }).catch(() => {});
     e.preventDefault();
   };
-
-  const navigateToSoapboxConfig = () => history.push('/soapbox/config');
-  const navigateToModerationLog = () => history.push('/soapbox/admin/log');
 
   const v = parseVersion(instance.version);
 
@@ -86,15 +81,22 @@ const Dashboard: React.FC = () => {
       <List>
         {account.admin && (
           <ListItem
-            onClick={navigateToSoapboxConfig}
+            to='/soapbox/config'
             label={<FormattedMessage id='navigation_bar.soapbox_config' defaultMessage='Soapbox config' />}
           />
         )}
 
         <ListItem
-          onClick={navigateToModerationLog}
+          to='/soapbox/admin/log'
           label={<FormattedMessage id='column.admin.moderation_log' defaultMessage='Moderation Log' />}
         />
+
+        {features.announcements && (
+          <ListItem
+            to='/soapbox/admin/announcements'
+            label={<FormattedMessage id='column.admin.announcements' defaultMessage='Announcements' />}
+          />
+        )}
       </List>
 
       {account.admin && (
@@ -115,13 +117,13 @@ const Dashboard: React.FC = () => {
         <ListItem label={<FormattedMessage id='admin.software.frontend' defaultMessage='Frontend' />}>
           <a
             href={sourceCode.ref ? `${sourceCode.url}/tree/${sourceCode.ref}` : sourceCode.url}
-            className='flex space-x-1 items-center truncate'
+            className='flex items-center space-x-1 truncate'
             target='_blank'
           >
             <span>{sourceCode.displayName} {sourceCode.version}</span>
 
             <Icon
-              className='w-4 h-4'
+              className='h-4 w-4'
               src={require('@tabler/icons/external-link.svg')}
             />
           </a>
@@ -143,7 +145,7 @@ const Dashboard: React.FC = () => {
               <IconButton
                 src={require('@tabler/icons/download.svg')}
                 onClick={handleSubscribersClick}
-                iconClassName='w-5 h-5'
+                iconClassName='h-5 w-5'
               />
             </ListItem>
 
@@ -151,7 +153,7 @@ const Dashboard: React.FC = () => {
               <IconButton
                 src={require('@tabler/icons/download.svg')}
                 onClick={handleUnsubscribersClick}
-                iconClassName='w-5 h-5'
+                iconClassName='h-5 w-5'
               />
             </ListItem>
 
@@ -159,7 +161,7 @@ const Dashboard: React.FC = () => {
               <IconButton
                 src={require('@tabler/icons/download.svg')}
                 onClick={handleCombinedClick}
-                iconClassName='w-5 h-5'
+                iconClassName='h-5 w-5'
               />
             </ListItem>
           </List>

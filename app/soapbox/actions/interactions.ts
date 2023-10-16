@@ -3,14 +3,15 @@ import { defineMessages } from 'react-intl';
 import toast from 'soapbox/toast';
 import { isLoggedIn } from 'soapbox/utils/auth';
 
-import api from '../api';
+import api, { getLinks } from '../api';
 
 import { fetchRelationships } from './accounts';
 import { importFetchedAccounts, importFetchedStatus } from './importer';
+import { expandGroupFeaturedTimeline } from './timelines';
 
 import type { AxiosError } from 'axios';
 import type { AppDispatch, RootState } from 'soapbox/store';
-import type { APIEntity, Status as StatusEntity } from 'soapbox/types/entities';
+import type { APIEntity, Group, Status as StatusEntity } from 'soapbox/types/entities';
 
 const REBLOG_REQUEST = 'REBLOG_REQUEST';
 const REBLOG_SUCCESS = 'REBLOG_SUCCESS';
@@ -20,6 +21,10 @@ const FAVOURITE_REQUEST = 'FAVOURITE_REQUEST';
 const FAVOURITE_SUCCESS = 'FAVOURITE_SUCCESS';
 const FAVOURITE_FAIL    = 'FAVOURITE_FAIL';
 
+const DISLIKE_REQUEST = 'DISLIKE_REQUEST';
+const DISLIKE_SUCCESS = 'DISLIKE_SUCCESS';
+const DISLIKE_FAIL    = 'DISLIKE_FAIL';
+
 const UNREBLOG_REQUEST = 'UNREBLOG_REQUEST';
 const UNREBLOG_SUCCESS = 'UNREBLOG_SUCCESS';
 const UNREBLOG_FAIL    = 'UNREBLOG_FAIL';
@@ -28,6 +33,10 @@ const UNFAVOURITE_REQUEST = 'UNFAVOURITE_REQUEST';
 const UNFAVOURITE_SUCCESS = 'UNFAVOURITE_SUCCESS';
 const UNFAVOURITE_FAIL    = 'UNFAVOURITE_FAIL';
 
+const UNDISLIKE_REQUEST = 'UNDISLIKE_REQUEST';
+const UNDISLIKE_SUCCESS = 'UNDISLIKE_SUCCESS';
+const UNDISLIKE_FAIL    = 'UNDISLIKE_FAIL';
+
 const REBLOGS_FETCH_REQUEST = 'REBLOGS_FETCH_REQUEST';
 const REBLOGS_FETCH_SUCCESS = 'REBLOGS_FETCH_SUCCESS';
 const REBLOGS_FETCH_FAIL    = 'REBLOGS_FETCH_FAIL';
@@ -35,6 +44,10 @@ const REBLOGS_FETCH_FAIL    = 'REBLOGS_FETCH_FAIL';
 const FAVOURITES_FETCH_REQUEST = 'FAVOURITES_FETCH_REQUEST';
 const FAVOURITES_FETCH_SUCCESS = 'FAVOURITES_FETCH_SUCCESS';
 const FAVOURITES_FETCH_FAIL    = 'FAVOURITES_FETCH_FAIL';
+
+const DISLIKES_FETCH_REQUEST = 'DISLIKES_FETCH_REQUEST';
+const DISLIKES_FETCH_SUCCESS = 'DISLIKES_FETCH_SUCCESS';
+const DISLIKES_FETCH_FAIL    = 'DISLIKES_FETCH_FAIL';
 
 const REACTIONS_FETCH_REQUEST = 'REACTIONS_FETCH_REQUEST';
 const REACTIONS_FETCH_SUCCESS = 'REACTIONS_FETCH_SUCCESS';
@@ -60,6 +73,12 @@ const REMOTE_INTERACTION_REQUEST = 'REMOTE_INTERACTION_REQUEST';
 const REMOTE_INTERACTION_SUCCESS = 'REMOTE_INTERACTION_SUCCESS';
 const REMOTE_INTERACTION_FAIL    = 'REMOTE_INTERACTION_FAIL';
 
+const FAVOURITES_EXPAND_SUCCESS = 'FAVOURITES_EXPAND_SUCCESS';
+const FAVOURITES_EXPAND_FAIL = 'FAVOURITES_EXPAND_FAIL';
+
+const REBLOGS_EXPAND_SUCCESS = 'REBLOGS_EXPAND_SUCCESS';
+const REBLOGS_EXPAND_FAIL = 'REBLOGS_EXPAND_FAIL';
+
 const messages = defineMessages({
   bookmarkAdded: { id: 'status.bookmarked', defaultMessage: 'Bookmark added.' },
   bookmarkRemoved: { id: 'status.unbookmarked', defaultMessage: 'Bookmark removed.' },
@@ -72,7 +91,7 @@ const reblog = (status: StatusEntity) =>
 
     dispatch(reblogRequest(status));
 
-    api(getState).post(`/api/v1/statuses/${status.get('id')}/reblog`).then(function(response) {
+    api(getState).post(`/api/v1/statuses/${status.id}/reblog`).then(function(response) {
       // The reblog API method returns a new status wrapped around the original. In this case we are only
       // interested in how the original is modified, hence passing it skipping the wrapper
       dispatch(importFetchedStatus(response.data.reblog));
@@ -88,7 +107,7 @@ const unreblog = (status: StatusEntity) =>
 
     dispatch(unreblogRequest(status));
 
-    api(getState).post(`/api/v1/statuses/${status.get('id')}/unreblog`).then(() => {
+    api(getState).post(`/api/v1/statuses/${status.id}/unreblog`).then(() => {
       dispatch(unreblogSuccess(status));
     }).catch(error => {
       dispatch(unreblogFail(status, error));
@@ -96,7 +115,7 @@ const unreblog = (status: StatusEntity) =>
   };
 
 const toggleReblog = (status: StatusEntity) =>
-  (dispatch: AppDispatch, getState: () => RootState) => {
+  (dispatch: AppDispatch) => {
     if (status.reblogged) {
       dispatch(unreblog(status));
     } else {
@@ -148,7 +167,7 @@ const favourite = (status: StatusEntity) =>
 
     dispatch(favouriteRequest(status));
 
-    api(getState).post(`/api/v1/statuses/${status.get('id')}/favourite`).then(function(response) {
+    api(getState).post(`/api/v1/statuses/${status.id}/favourite`).then(function(response) {
       dispatch(favouriteSuccess(status));
     }).catch(function(error) {
       dispatch(favouriteFail(status, error));
@@ -161,7 +180,7 @@ const unfavourite = (status: StatusEntity) =>
 
     dispatch(unfavouriteRequest(status));
 
-    api(getState).post(`/api/v1/statuses/${status.get('id')}/unfavourite`).then(() => {
+    api(getState).post(`/api/v1/statuses/${status.id}/unfavourite`).then(() => {
       dispatch(unfavouriteSuccess(status));
     }).catch(error => {
       dispatch(unfavouriteFail(status, error));
@@ -169,7 +188,7 @@ const unfavourite = (status: StatusEntity) =>
   };
 
 const toggleFavourite = (status: StatusEntity) =>
-  (dispatch: AppDispatch, getState: () => RootState) => {
+  (dispatch: AppDispatch) => {
     if (status.favourited) {
       dispatch(unfavourite(status));
     } else {
@@ -215,11 +234,84 @@ const unfavouriteFail = (status: StatusEntity, error: AxiosError) => ({
   skipLoading: true,
 });
 
+const dislike = (status: StatusEntity) =>
+  (dispatch: AppDispatch, getState: () => RootState) => {
+    if (!isLoggedIn(getState)) return;
+
+    dispatch(dislikeRequest(status));
+
+    api(getState).post(`/api/friendica/statuses/${status.id}/dislike`).then(function() {
+      dispatch(dislikeSuccess(status));
+    }).catch(function(error) {
+      dispatch(dislikeFail(status, error));
+    });
+  };
+
+const undislike = (status: StatusEntity) =>
+  (dispatch: AppDispatch, getState: () => RootState) => {
+    if (!isLoggedIn(getState)) return;
+
+    dispatch(undislikeRequest(status));
+
+    api(getState).post(`/api/friendica/statuses/${status.id}/undislike`).then(() => {
+      dispatch(undislikeSuccess(status));
+    }).catch(error => {
+      dispatch(undislikeFail(status, error));
+    });
+  };
+
+const toggleDislike = (status: StatusEntity) =>
+  (dispatch: AppDispatch) => {
+    if (status.disliked) {
+      dispatch(undislike(status));
+    } else {
+      dispatch(dislike(status));
+    }
+  };
+
+const dislikeRequest = (status: StatusEntity) => ({
+  type: DISLIKE_REQUEST,
+  status: status,
+  skipLoading: true,
+});
+
+const dislikeSuccess = (status: StatusEntity) => ({
+  type: DISLIKE_SUCCESS,
+  status: status,
+  skipLoading: true,
+});
+
+const dislikeFail = (status: StatusEntity, error: AxiosError) => ({
+  type: DISLIKE_FAIL,
+  status: status,
+  error: error,
+  skipLoading: true,
+});
+
+const undislikeRequest = (status: StatusEntity) => ({
+  type: UNDISLIKE_REQUEST,
+  status: status,
+  skipLoading: true,
+});
+
+const undislikeSuccess = (status: StatusEntity) => ({
+  type: UNDISLIKE_SUCCESS,
+  status: status,
+  skipLoading: true,
+});
+
+const undislikeFail = (status: StatusEntity, error: AxiosError) => ({
+  type: UNDISLIKE_FAIL,
+  status: status,
+  error: error,
+  skipLoading: true,
+});
+
 const bookmark = (status: StatusEntity) =>
   (dispatch: AppDispatch, getState: () => RootState) => {
     dispatch(bookmarkRequest(status));
 
-    api(getState).post(`/api/v1/statuses/${status.get('id')}/bookmark`).then(function(response) {
+    api(getState).post(`/api/v1/statuses/${status.id}/bookmark`).then(function(response) {
       dispatch(importFetchedStatus(response.data));
       dispatch(bookmarkSuccess(status, response.data));
       toast.success(messages.bookmarkAdded, {
@@ -235,7 +327,7 @@ const unbookmark = (status: StatusEntity) =>
   (dispatch: AppDispatch, getState: () => RootState) => {
     dispatch(unbookmarkRequest(status));
 
-    api(getState).post(`/api/v1/statuses/${status.get('id')}/unbookmark`).then(response => {
+    api(getState).post(`/api/v1/statuses/${status.id}/unbookmark`).then(response => {
       dispatch(importFetchedStatus(response.data));
       dispatch(unbookmarkSuccess(status, response.data));
       toast.success(messages.bookmarkRemoved);
@@ -294,9 +386,10 @@ const fetchReblogs = (id: string) =>
     dispatch(fetchReblogsRequest(id));
 
     api(getState).get(`/api/v1/statuses/${id}/reblogged_by`).then(response => {
+      const next = getLinks(response).refs.find(link => link.rel === 'next');
       dispatch(importFetchedAccounts(response.data));
       dispatch(fetchRelationships(response.data.map((item: APIEntity) => item.id)));
-      dispatch(fetchReblogsSuccess(id, response.data));
+      dispatch(fetchReblogsSuccess(id, response.data, next ? next.uri : null));
     }).catch(error => {
       dispatch(fetchReblogsFail(id, error));
     });
@@ -307,14 +400,40 @@ const fetchReblogsRequest = (id: string) => ({
   id,
 });
 
-const fetchReblogsSuccess = (id: string, accounts: APIEntity[]) => ({
+const fetchReblogsSuccess = (id: string, accounts: APIEntity[], next: string | null) => ({
   type: REBLOGS_FETCH_SUCCESS,
   id,
   accounts,
+  next,
 });
 
 const fetchReblogsFail = (id: string, error: AxiosError) => ({
   type: REBLOGS_FETCH_FAIL,
+  id,
+  error,
+});
+
+const expandReblogs = (id: string, path: string) =>
+  (dispatch: AppDispatch, getState: () => RootState) => {
+    api(getState).get(path).then(response => {
+      const next = getLinks(response).refs.find(link => link.rel === 'next');
+      dispatch(importFetchedAccounts(response.data));
+      dispatch(fetchRelationships(response.data.map((item: APIEntity) => item.id)));
+      dispatch(expandReblogsSuccess(id, response.data, next ? next.uri : null));
+    }).catch(error => {
+      dispatch(expandReblogsFail(id, error));
+    });
+  };
+
+const expandReblogsSuccess = (id: string, accounts: APIEntity[], next: string | null) => ({
+  type: REBLOGS_EXPAND_SUCCESS,
+  id,
+  accounts,
+  next,
+});
+
+const expandReblogsFail = (id: string, error: AxiosError) => ({
+  type: REBLOGS_EXPAND_FAIL,
   id,
   error,
 });
@@ -326,9 +445,10 @@ const fetchFavourites = (id: string) =>
     dispatch(fetchFavouritesRequest(id));
 
     api(getState).get(`/api/v1/statuses/${id}/favourited_by`).then(response => {
+      const next = getLinks(response).refs.find(link => link.rel === 'next');
       dispatch(importFetchedAccounts(response.data));
       dispatch(fetchRelationships(response.data.map((item: APIEntity) => item.id)));
-      dispatch(fetchFavouritesSuccess(id, response.data));
+      dispatch(fetchFavouritesSuccess(id, response.data, next ? next.uri : null));
     }).catch(error => {
       dispatch(fetchFavouritesFail(id, error));
     });
@@ -339,14 +459,72 @@ const fetchFavouritesRequest = (id: string) => ({
   id,
 });
 
-const fetchFavouritesSuccess = (id: string, accounts: APIEntity[]) => ({
+const fetchFavouritesSuccess = (id: string, accounts: APIEntity[], next: string | null) => ({
   type: FAVOURITES_FETCH_SUCCESS,
   id,
   accounts,
+  next,
 });
 
 const fetchFavouritesFail = (id: string, error: AxiosError) => ({
   type: FAVOURITES_FETCH_FAIL,
+  id,
+  error,
+});
+
+const expandFavourites = (id: string, path: string) =>
+  (dispatch: AppDispatch, getState: () => RootState) => {
+    api(getState).get(path).then(response => {
+      const next = getLinks(response).refs.find(link => link.rel === 'next');
+      dispatch(importFetchedAccounts(response.data));
+      dispatch(fetchRelationships(response.data.map((item: APIEntity) => item.id)));
+      dispatch(expandFavouritesSuccess(id, response.data, next ? next.uri : null));
+    }).catch(error => {
+      dispatch(expandFavouritesFail(id, error));
+    });
+  };
+
+const expandFavouritesSuccess = (id: string, accounts: APIEntity[], next: string | null) => ({
+  type: FAVOURITES_EXPAND_SUCCESS,
+  id,
+  accounts,
+  next,
+});
+
+const expandFavouritesFail = (id: string, error: AxiosError) => ({
+  type: FAVOURITES_EXPAND_FAIL,
+  id,
+  error,
+});
+
+const fetchDislikes = (id: string) =>
+  (dispatch: AppDispatch, getState: () => RootState) => {
+    if (!isLoggedIn(getState)) return;
+
+    dispatch(fetchDislikesRequest(id));
+
+    api(getState).get(`/api/friendica/statuses/${id}/disliked_by`).then(response => {
+      dispatch(importFetchedAccounts(response.data));
+      dispatch(fetchRelationships(response.data.map((item: APIEntity) => item.id)));
+      dispatch(fetchDislikesSuccess(id, response.data));
+    }).catch(error => {
+      dispatch(fetchDislikesFail(id, error));
+    });
+  };
+
+const fetchDislikesRequest = (id: string) => ({
+  type: DISLIKES_FETCH_REQUEST,
+  id,
+});
+
+const fetchDislikesSuccess = (id: string, accounts: APIEntity[]) => ({
+  type: DISLIKES_FETCH_SUCCESS,
+  id,
+  accounts,
+});
+
+const fetchDislikesFail = (id: string, error: AxiosError) => ({
+  type: DISLIKES_FETCH_FAIL,
   id,
   error,
 });
@@ -386,12 +564,26 @@ const pin = (status: StatusEntity) =>
 
     dispatch(pinRequest(status));
 
-    api(getState).post(`/api/v1/statuses/${status.get('id')}/pin`).then(response => {
+    api(getState).post(`/api/v1/statuses/${status.id}/pin`).then(response => {
       dispatch(importFetchedStatus(response.data));
       dispatch(pinSuccess(status));
     }).catch(error => {
       dispatch(pinFail(status, error));
     });
+  };
+
+const pinToGroup = (status: StatusEntity, group: Group) =>
+  (dispatch: AppDispatch, getState: () => RootState) => {
+    return api(getState)
+      .post(`/api/v1/groups/${group.id}/statuses/${status.id}/pin`)
+      .then(() => dispatch(expandGroupFeaturedTimeline(group.id)));
+  };
+
+const unpinFromGroup = (status: StatusEntity, group: Group) =>
+  (dispatch: AppDispatch, getState: () => RootState) => {
+    return api(getState)
+      .post(`/api/v1/groups/${group.id}/statuses/${status.id}/unpin`)
+      .then(() => dispatch(expandGroupFeaturedTimeline(group.id)));
   };
 
 const pinRequest = (status: StatusEntity) => ({
@@ -419,7 +611,7 @@ const unpin = (status: StatusEntity) =>
 
     dispatch(unpinRequest(status));
 
-    api(getState).post(`/api/v1/statuses/${status.get('id')}/unpin`).then(response => {
+    api(getState).post(`/api/v1/statuses/${status.id}/unpin`).then(response => {
       dispatch(importFetchedStatus(response.data));
       dispatch(unpinSuccess(status));
     }).catch(error => {
@@ -498,18 +690,27 @@ export {
   FAVOURITE_REQUEST,
   FAVOURITE_SUCCESS,
   FAVOURITE_FAIL,
+  DISLIKE_REQUEST,
+  DISLIKE_SUCCESS,
+  DISLIKE_FAIL,
   UNREBLOG_REQUEST,
   UNREBLOG_SUCCESS,
   UNREBLOG_FAIL,
   UNFAVOURITE_REQUEST,
   UNFAVOURITE_SUCCESS,
   UNFAVOURITE_FAIL,
+  UNDISLIKE_REQUEST,
+  UNDISLIKE_SUCCESS,
+  UNDISLIKE_FAIL,
   REBLOGS_FETCH_REQUEST,
   REBLOGS_FETCH_SUCCESS,
   REBLOGS_FETCH_FAIL,
   FAVOURITES_FETCH_REQUEST,
   FAVOURITES_FETCH_SUCCESS,
   FAVOURITES_FETCH_FAIL,
+  DISLIKES_FETCH_REQUEST,
+  DISLIKES_FETCH_SUCCESS,
+  DISLIKES_FETCH_FAIL,
   REACTIONS_FETCH_REQUEST,
   REACTIONS_FETCH_SUCCESS,
   REACTIONS_FETCH_FAIL,
@@ -528,6 +729,10 @@ export {
   REMOTE_INTERACTION_REQUEST,
   REMOTE_INTERACTION_SUCCESS,
   REMOTE_INTERACTION_FAIL,
+  FAVOURITES_EXPAND_SUCCESS,
+  FAVOURITES_EXPAND_FAIL,
+  REBLOGS_EXPAND_SUCCESS,
+  REBLOGS_EXPAND_FAIL,
   reblog,
   unreblog,
   toggleReblog,
@@ -546,6 +751,15 @@ export {
   unfavouriteRequest,
   unfavouriteSuccess,
   unfavouriteFail,
+  dislike,
+  undislike,
+  toggleDislike,
+  dislikeRequest,
+  dislikeSuccess,
+  dislikeFail,
+  undislikeRequest,
+  undislikeSuccess,
+  undislikeFail,
   bookmark,
   unbookmark,
   toggleBookmark,
@@ -559,10 +773,16 @@ export {
   fetchReblogsRequest,
   fetchReblogsSuccess,
   fetchReblogsFail,
+  expandReblogs,
   fetchFavourites,
   fetchFavouritesRequest,
   fetchFavouritesSuccess,
   fetchFavouritesFail,
+  expandFavourites,
+  fetchDislikes,
+  fetchDislikesRequest,
+  fetchDislikesSuccess,
+  fetchDislikesFail,
   fetchReactions,
   fetchReactionsRequest,
   fetchReactionsSuccess,
@@ -576,6 +796,8 @@ export {
   unpinSuccess,
   unpinFail,
   togglePin,
+  pinToGroup,
+  unpinFromGroup,
   remoteInteraction,
   remoteInteractionRequest,
   remoteInteractionSuccess,

@@ -1,3 +1,6 @@
+import { importEntities } from 'soapbox/entity-store/actions';
+import { Entities } from 'soapbox/entity-store/entities';
+import { selectAccount } from 'soapbox/selectors';
 import { isLoggedIn } from 'soapbox/utils/auth';
 import { getFeatures, parseVersion, PLEROMA } from 'soapbox/utils/features';
 
@@ -22,14 +25,6 @@ const ACCOUNT_CREATE_FAIL    = 'ACCOUNT_CREATE_FAIL';
 const ACCOUNT_FETCH_REQUEST = 'ACCOUNT_FETCH_REQUEST';
 const ACCOUNT_FETCH_SUCCESS = 'ACCOUNT_FETCH_SUCCESS';
 const ACCOUNT_FETCH_FAIL    = 'ACCOUNT_FETCH_FAIL';
-
-const ACCOUNT_FOLLOW_REQUEST = 'ACCOUNT_FOLLOW_REQUEST';
-const ACCOUNT_FOLLOW_SUCCESS = 'ACCOUNT_FOLLOW_SUCCESS';
-const ACCOUNT_FOLLOW_FAIL    = 'ACCOUNT_FOLLOW_FAIL';
-
-const ACCOUNT_UNFOLLOW_REQUEST = 'ACCOUNT_UNFOLLOW_REQUEST';
-const ACCOUNT_UNFOLLOW_SUCCESS = 'ACCOUNT_UNFOLLOW_SUCCESS';
-const ACCOUNT_UNFOLLOW_FAIL    = 'ACCOUNT_UNFOLLOW_FAIL';
 
 const ACCOUNT_BLOCK_REQUEST = 'ACCOUNT_BLOCK_REQUEST';
 const ACCOUNT_BLOCK_SUCCESS = 'ACCOUNT_BLOCK_SUCCESS';
@@ -147,9 +142,9 @@ const fetchAccount = (id: string) =>
   (dispatch: AppDispatch, getState: () => RootState) => {
     dispatch(fetchRelationships([id]));
 
-    const account = getState().accounts.get(id);
+    const account = selectAccount(getState(), id);
 
-    if (account && !account.get('should_refetch')) {
+    if (account) {
       return null;
     }
 
@@ -227,81 +222,6 @@ const fetchAccountFail = (id: string | null, error: AxiosError) => ({
   skipAlert: true,
 });
 
-type FollowAccountOpts = {
-  reblogs?: boolean,
-  notify?: boolean
-};
-
-const followAccount = (id: string, options?: FollowAccountOpts) =>
-  (dispatch: AppDispatch, getState: () => RootState) => {
-    if (!isLoggedIn(getState)) return null;
-
-    const alreadyFollowing = getState().relationships.get(id)?.following || undefined;
-    const locked = getState().accounts.get(id)?.locked || false;
-
-    dispatch(followAccountRequest(id, locked));
-
-    return api(getState)
-      .post(`/api/v1/accounts/${id}/follow`, options)
-      .then(response => dispatch(followAccountSuccess(response.data, alreadyFollowing)))
-      .catch(error => {
-        dispatch(followAccountFail(error, locked));
-        throw error;
-      });
-  };
-
-const unfollowAccount = (id: string) =>
-  (dispatch: AppDispatch, getState: () => RootState) => {
-    if (!isLoggedIn(getState)) return null;
-
-    dispatch(unfollowAccountRequest(id));
-
-    return api(getState)
-      .post(`/api/v1/accounts/${id}/unfollow`)
-      .then(response => dispatch(unfollowAccountSuccess(response.data, getState().statuses)))
-      .catch(error => dispatch(unfollowAccountFail(error)));
-  };
-
-const followAccountRequest = (id: string, locked: boolean) => ({
-  type: ACCOUNT_FOLLOW_REQUEST,
-  id,
-  locked,
-  skipLoading: true,
-});
-
-const followAccountSuccess = (relationship: APIEntity, alreadyFollowing?: boolean) => ({
-  type: ACCOUNT_FOLLOW_SUCCESS,
-  relationship,
-  alreadyFollowing,
-  skipLoading: true,
-});
-
-const followAccountFail = (error: AxiosError, locked: boolean) => ({
-  type: ACCOUNT_FOLLOW_FAIL,
-  error,
-  locked,
-  skipLoading: true,
-});
-
-const unfollowAccountRequest = (id: string) => ({
-  type: ACCOUNT_UNFOLLOW_REQUEST,
-  id,
-  skipLoading: true,
-});
-
-const unfollowAccountSuccess = (relationship: APIEntity, statuses: ImmutableMap<string, Status>) => ({
-  type: ACCOUNT_UNFOLLOW_SUCCESS,
-  relationship,
-  statuses,
-  skipLoading: true,
-});
-
-const unfollowAccountFail = (error: AxiosError) => ({
-  type: ACCOUNT_UNFOLLOW_FAIL,
-  error,
-  skipLoading: true,
-});
-
 const blockAccount = (id: string) =>
   (dispatch: AppDispatch, getState: () => RootState) => {
     if (!isLoggedIn(getState)) return null;
@@ -311,6 +231,7 @@ const blockAccount = (id: string) =>
     return api(getState)
       .post(`/api/v1/accounts/${id}/block`)
       .then(response => {
+        dispatch(importEntities([response.data], Entities.RELATIONSHIPS));
         // Pass in entire statuses map so we can use it to filter stuff in different parts of the reducers
         return dispatch(blockAccountSuccess(response.data, getState().statuses));
       }).catch(error => dispatch(blockAccountFail(error)));
@@ -324,7 +245,10 @@ const unblockAccount = (id: string) =>
 
     return api(getState)
       .post(`/api/v1/accounts/${id}/unblock`)
-      .then(response => dispatch(unblockAccountSuccess(response.data)))
+      .then(response => {
+        dispatch(importEntities([response.data], Entities.RELATIONSHIPS));
+        return dispatch(unblockAccountSuccess(response.data));
+      })
       .catch(error => dispatch(unblockAccountFail(error)));
   };
 
@@ -384,6 +308,7 @@ const muteAccount = (id: string, notifications?: boolean, duration = 0) =>
     return api(getState)
       .post(`/api/v1/accounts/${id}/mute`, params)
       .then(response => {
+        dispatch(importEntities([response.data], Entities.RELATIONSHIPS));
         // Pass in entire statuses map so we can use it to filter stuff in different parts of the reducers
         return dispatch(muteAccountSuccess(response.data, getState().statuses));
       })
@@ -398,7 +323,10 @@ const unmuteAccount = (id: string) =>
 
     return api(getState)
       .post(`/api/v1/accounts/${id}/unmute`)
-      .then(response => dispatch(unmuteAccountSuccess(response.data)))
+      .then(response => {
+        dispatch(importEntities([response.data], Entities.RELATIONSHIPS));
+        return dispatch(unmuteAccountSuccess(response.data));
+      })
       .catch(error => dispatch(unmuteAccountFail(error)));
   };
 
@@ -690,7 +618,10 @@ const fetchRelationships = (accountIds: string[]) =>
 
     return api(getState)
       .get(`/api/v1/accounts/relationships?${newAccountIds.map(id => `id[]=${id}`).join('&')}`)
-      .then(response => dispatch(fetchRelationshipsSuccess(response.data)))
+      .then(response => {
+        dispatch(importEntities(response.data, Entities.RELATIONSHIPS));
+        dispatch(fetchRelationshipsSuccess(response.data));
+      })
       .catch(error => dispatch(fetchRelationshipsFail(error)));
   };
 
@@ -988,12 +919,6 @@ export {
   ACCOUNT_FETCH_REQUEST,
   ACCOUNT_FETCH_SUCCESS,
   ACCOUNT_FETCH_FAIL,
-  ACCOUNT_FOLLOW_REQUEST,
-  ACCOUNT_FOLLOW_SUCCESS,
-  ACCOUNT_FOLLOW_FAIL,
-  ACCOUNT_UNFOLLOW_REQUEST,
-  ACCOUNT_UNFOLLOW_SUCCESS,
-  ACCOUNT_UNFOLLOW_FAIL,
   ACCOUNT_BLOCK_REQUEST,
   ACCOUNT_BLOCK_SUCCESS,
   ACCOUNT_BLOCK_FAIL,
@@ -1069,14 +994,6 @@ export {
   fetchAccountRequest,
   fetchAccountSuccess,
   fetchAccountFail,
-  followAccount,
-  unfollowAccount,
-  followAccountRequest,
-  followAccountSuccess,
-  followAccountFail,
-  unfollowAccountRequest,
-  unfollowAccountSuccess,
-  unfollowAccountFail,
   blockAccount,
   unblockAccount,
   blockAccountRequest,

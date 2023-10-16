@@ -2,7 +2,7 @@ import { List as ImmutableList, Map as ImmutableMap, Record as ImmutableRecord, 
 import trim from 'lodash/trim';
 
 import { MASTODON_PRELOAD_IMPORT } from 'soapbox/actions/preload';
-import BuildConfig from 'soapbox/build-config';
+import * as BuildConfig from 'soapbox/build-config';
 import KVStore from 'soapbox/storage/kv-store';
 import { validId, isURL } from 'soapbox/utils/auth';
 
@@ -272,8 +272,8 @@ const deleteToken = (state: State, token: string) => {
   });
 };
 
-const deleteUser = (state: State, account: AccountEntity) => {
-  const accountUrl = account.get('url');
+const deleteUser = (state: State, account: Pick<AccountEntity, 'url'>) => {
+  const accountUrl = account.url;
 
   return state.withMutations(state => {
     state.update('users', users => users.delete(accountUrl));
@@ -347,7 +347,7 @@ const reducer = (state: State, action: AnyAction) => {
     case VERIFY_CREDENTIALS_FAIL:
       return deleteForbiddenToken(state, action.error, action.token);
     case SWITCH_ACCOUNT:
-      return state.set('me', action.account.get('url'));
+      return state.set('me', action.account.url);
     case ME_FETCH_SKIP:
       return state.set('me', null);
     case MASTODON_PRELOAD_IMPORT:

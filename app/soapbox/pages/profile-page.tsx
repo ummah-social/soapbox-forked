@@ -2,6 +2,7 @@ import React from 'react';
 import { FormattedMessage } from 'react-intl';
 import { Redirect, useHistory } from 'react-router-dom';
 
+import { useAccountLookup } from 'soapbox/api/hooks';
 import { Column, Layout, Tabs } from 'soapbox/components/ui';
 import Header from 'soapbox/features/account/components/header';
 import LinkFooter from 'soapbox/features/ui/components/link-footer';
@@ -14,33 +15,24 @@ import {
   SignUpPanel,
   CtaBanner,
   PinnedAccountsPanel,
+  AccountNotePanel,
 } from 'soapbox/features/ui/util/async-components';
 import { useAppSelector, useFeatures, useSoapboxConfig } from 'soapbox/hooks';
-import { findAccountByUsername, makeGetAccount } from 'soapbox/selectors';
 import { getAcct, isLocal } from 'soapbox/utils/accounts';
 
 interface IProfilePage {
   params?: {
-    username?: string,
-  },
-  children: React.ReactNode,
+    username?: string
+  }
+  children: React.ReactNode
 }
-
-const getAccount = makeGetAccount();
 
 /** Page to display a user's profile. */
 const ProfilePage: React.FC<IProfilePage> = ({ params, children }) => {
   const history = useHistory();
   const username = params?.username || '';
 
-  const account = useAppSelector(state => {
-    if (username) {
-      const account = findAccountByUsername(state, username);
-      if (account) {
-        return getAccount(state, account.id) || undefined;
-      }
-    }
-  });
+  const { account } = useAccountLookup(username, { withRelationship: true });
 
   const me = useAppSelector(state => state.me);
   const features = useFeatures();
@@ -71,7 +63,7 @@ const ProfilePage: React.FC<IProfilePage> = ({ params, children }) => {
 
   if (account) {
     const ownAccount = account.id === me;
-    if (ownAccount || !account.pleroma.get('hide_favorites', true)) {
+    if (ownAccount || account.pleroma?.hide_favorites === false) {
       tabItems.push({
         text: <FormattedMessage id='navigation_bar.favourites' defaultMessage='Likes' />,
         to: `/@${account.acct}/favorites`,
@@ -97,7 +89,7 @@ const ProfilePage: React.FC<IProfilePage> = ({ params, children }) => {
   return (
     <>
       <Layout.Main>
-        <Column label={account ? `@${getAcct(account, displayFqn)}` : ''} withHeader={false}>
+        <Column size='lg' label={account ? `@${getAcct(account, displayFqn)}` : ''} withHeader={false}>
           <div className='space-y-4'>
             <Header account={account} />
 
@@ -126,10 +118,16 @@ const ProfilePage: React.FC<IProfilePage> = ({ params, children }) => {
             {Component => <Component key='sign-up-panel' />}
           </BundleContainer>
         )}
+
+        {features.notes && account && account?.id !== me && (
+          <BundleContainer fetchComponent={AccountNotePanel}>
+            {Component => <Component account={account} />}
+          </BundleContainer>
+        )}
         <BundleContainer fetchComponent={ProfileMediaPanel}>
           {Component => <Component account={account} />}
         </BundleContainer>
-        {account && !account.fields.isEmpty() && (
+        {(account && account.fields.length > 0) && (
           <BundleContainer fetchComponent={ProfileFieldsPanel}>
             {Component => <Component account={account} />}
           </BundleContainer>

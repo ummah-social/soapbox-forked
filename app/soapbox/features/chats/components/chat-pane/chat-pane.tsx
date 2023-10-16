@@ -8,9 +8,9 @@ import { useDebounce, useFeatures } from 'soapbox/hooks';
 import { IChat, useChats } from 'soapbox/queries/chats';
 
 import ChatList from '../chat-list';
-import ChatSearchInput from '../chat-search-input';
 import ChatSearch from '../chat-search/chat-search';
 import EmptyResultsBlankslate from '../chat-search/empty-results-blankslate';
+import ChatSearchInput from '../chat-search-input';
 import ChatPaneHeader from '../chat-widget/chat-pane-header';
 import ChatWindow from '../chat-widget/chat-window';
 import ChatSearchHeader from '../chat-widget/headers/chat-search-header';
@@ -45,7 +45,7 @@ const ChatPane = () => {
   const renderBody = () => {
     if (hasSearchValue || Number(chats?.length) > 0 || isLoading) {
       return (
-        <Stack space={4} className='flex-grow h-full'>
+        <Stack space={4} className='h-full grow'>
           {features.chatsSearch && (
             <div className='px-4'>
               <ChatSearchInput

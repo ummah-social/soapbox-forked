@@ -4,8 +4,8 @@ import React from 'react';
 import { useIntl, defineMessages, FormattedMessage } from 'react-intl';
 
 import { openModal } from 'soapbox/actions/modals';
+import DropdownMenu from 'soapbox/components/dropdown-menu';
 import { Widget } from 'soapbox/components/ui';
-import DropdownMenu from 'soapbox/containers/dropdown-menu-container';
 import InstanceRestrictions from 'soapbox/features/federation-restrictions/components/instance-restrictions';
 import { useAppSelector, useAppDispatch, useOwnAccount } from 'soapbox/hooks';
 import { makeGetRemoteInstance } from 'soapbox/selectors';
@@ -18,7 +18,7 @@ const messages = defineMessages({
 
 interface IInstanceModerationPanel {
   /** Host (eg "gleasonator.com") of the remote instance to moderate. */
-  host: string,
+  host: string
 }
 
 /** Widget for moderators to manage a remote instance. */
@@ -26,7 +26,7 @@ const InstanceModerationPanel: React.FC<IInstanceModerationPanel> = ({ host }) =
   const intl = useIntl();
   const dispatch = useAppDispatch();
 
-  const account = useOwnAccount();
+  const { account } = useOwnAccount();
   const remoteInstance = useAppSelector(state => getRemoteInstance(state, host));
 
   const handleEditFederation = () => {

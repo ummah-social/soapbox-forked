@@ -1,10 +1,9 @@
 import React, { useEffect } from 'react';
 import { defineMessages, FormattedMessage, useIntl } from 'react-intl';
-import { useHistory } from 'react-router-dom';
 
 import { fetchMfa } from 'soapbox/actions/mfa';
 import List, { ListItem } from 'soapbox/components/list';
-import { Card, CardBody, CardHeader, CardTitle, Column } from 'soapbox/components/ui';
+import { Card, CardBody, CardHeader, CardTitle, Column, Text } from 'soapbox/components/ui';
 import { useAppDispatch, useAppSelector, useFeatures, useOwnAccount } from 'soapbox/hooks';
 
 import Preferences from '../preferences';
@@ -12,47 +11,37 @@ import Preferences from '../preferences';
 import MessagesSettings from './components/messages-settings';
 
 const messages = defineMessages({
-  settings: { id: 'settings.settings', defaultMessage: 'Settings' },
-  profile: { id: 'settings.profile', defaultMessage: 'Profile' },
-  security: { id: 'settings.security', defaultMessage: 'Security' },
-  preferences: { id: 'settings.preferences', defaultMessage: 'Preferences' },
-  editProfile: { id: 'settings.edit_profile', defaultMessage: 'Edit Profile' },
+  accountAliases: { id: 'navigation_bar.account_aliases', defaultMessage: 'Account aliases' },
+  accountMigration: { id: 'settings.account_migration', defaultMessage: 'Move Account' },
+  backups: { id: 'column.backups', defaultMessage: 'Backups' },
+  blocks: { id: 'settings.blocks', defaultMessage: 'Blocks' },
   changeEmail: { id: 'settings.change_email', defaultMessage: 'Change Email' },
   changePassword: { id: 'settings.change_password', defaultMessage: 'Change Password' },
   configureMfa: { id: 'settings.configure_mfa', defaultMessage: 'Configure MFA' },
-  sessions: { id: 'settings.sessions', defaultMessage: 'Active sessions' },
   deleteAccount: { id: 'settings.delete_account', defaultMessage: 'Delete Account' },
-  accountMigration: { id: 'settings.account_migration', defaultMessage: 'Move Account' },
-  accountAliases: { id: 'navigation_bar.account_aliases', defaultMessage: 'Account aliases' },
-  other: { id: 'settings.other', defaultMessage: 'Other options' },
-  mfaEnabled: { id: 'mfa.enabled', defaultMessage: 'Enabled' },
-  mfaDisabled: { id: 'mfa.disabled', defaultMessage: 'Disabled' },
-  backups: { id: 'column.backups', defaultMessage: 'Backups' },
-  importData: { id: 'navigation_bar.import_data', defaultMessage: 'Import data' },
+  editProfile: { id: 'settings.edit_profile', defaultMessage: 'Edit Profile' },
   exportData: { id: 'column.export_data', defaultMessage: 'Export data' },
+  importData: { id: 'navigation_bar.import_data', defaultMessage: 'Import data' },
+  mfaDisabled: { id: 'mfa.disabled', defaultMessage: 'Disabled' },
+  mfaEnabled: { id: 'mfa.enabled', defaultMessage: 'Enabled' },
+  mutes: { id: 'settings.mutes', defaultMessage: 'Mutes' },
+  other: { id: 'settings.other', defaultMessage: 'Other options' },
+  preferences: { id: 'settings.preferences', defaultMessage: 'Preferences' },
+  privacy: { id: 'settings.privacy', defaultMessage: 'Privacy' },
+  profile: { id: 'settings.profile', defaultMessage: 'Profile' },
+  security: { id: 'settings.security', defaultMessage: 'Security' },
+  sessions: { id: 'settings.sessions', defaultMessage: 'Active sessions' },
+  settings: { id: 'settings.settings', defaultMessage: 'Settings' },
 });
 
 /** User settings page. */
 const Settings = () => {
   const dispatch = useAppDispatch();
-  const history = useHistory();
   const intl = useIntl();
 
   const mfa = useAppSelector((state) => state.security.get('mfa'));
   const features = useFeatures();
-  const account = useOwnAccount();
-
-  const navigateToChangeEmail = () => history.push('/settings/email');
-  const navigateToChangePassword = () => history.push('/settings/password');
-  const navigateToMfa = () => history.push('/settings/mfa');
-  const navigateToSessions = () => history.push('/settings/tokens');
-  const navigateToEditProfile = () => history.push('/settings/profile');
-  const navigateToDeleteAccount = () => history.push('/settings/account');
-  const navigateToMoveAccount = () => history.push('/settings/migration');
-  const navigateToAliases = () => history.push('/settings/aliases');
-  const navigateToBackups = () => history.push('/settings/backups');
-  const navigateToImportData = () => history.push('/settings/import');
-  const navigateToExportData = () => history.push('/settings/export');
+  const { account } = useOwnAccount();
 
   const isMfaEnabled = mfa.getIn(['settings', 'totp']);
 
@@ -73,9 +62,20 @@ const Settings = () => {
 
         <CardBody>
           <List>
-            <ListItem label={intl.formatMessage(messages.editProfile)} onClick={navigateToEditProfile}>
-              <span>{displayName}</span>
+            <ListItem label={intl.formatMessage(messages.editProfile)} to='/settings/profile'>
+              <span className='max-w-full truncate'>{displayName}</span>
             </ListItem>
+          </List>
+        </CardBody>
+
+        <CardHeader>
+          <CardTitle title={intl.formatMessage(messages.privacy)} />
+        </CardHeader>
+
+        <CardBody>
+          <List>
+            <ListItem label={intl.formatMessage(messages.mutes)} to='/mutes' />
+            <ListItem label={intl.formatMessage(messages.blocks)} to='/blocks' />
           </List>
         </CardBody>
 
@@ -89,9 +89,9 @@ const Settings = () => {
               <List>
                 {features.security && (
                   <>
-                    <ListItem label={intl.formatMessage(messages.changeEmail)} onClick={navigateToChangeEmail} />
-                    <ListItem label={intl.formatMessage(messages.changePassword)} onClick={navigateToChangePassword} />
-                    <ListItem label={intl.formatMessage(messages.configureMfa)} onClick={navigateToMfa}>
+                    <ListItem label={intl.formatMessage(messages.changeEmail)} to='/settings/email' />
+                    <ListItem label={intl.formatMessage(messages.changePassword)} to='/settings/password' />
+                    <ListItem label={intl.formatMessage(messages.configureMfa)} to='/settings/mfa'>
                       <span>
                         {isMfaEnabled ?
                           intl.formatMessage(messages.mfaEnabled) :
@@ -101,7 +101,7 @@ const Settings = () => {
                   </>
                 )}
                 {features.sessions && (
-                  <ListItem label={intl.formatMessage(messages.sessions)} onClick={navigateToSessions} />
+                  <ListItem label={intl.formatMessage(messages.sessions)} to='/settings/tokens' />
                 )}
               </List>
             </CardBody>
@@ -137,25 +137,25 @@ const Settings = () => {
             <CardBody>
               <List>
                 {features.importData && (
-                  <ListItem label={intl.formatMessage(messages.importData)} onClick={navigateToImportData} />
+                  <ListItem label={intl.formatMessage(messages.importData)} to='/settings/import' />
                 )}
 
                 {features.exportData && (
-                  <ListItem label={intl.formatMessage(messages.exportData)} onClick={navigateToExportData} />
+                  <ListItem label={intl.formatMessage(messages.exportData)} to='/settings/export' />
                 )}
 
                 {features.backups && (
-                  <ListItem label={intl.formatMessage(messages.backups)} onClick={navigateToBackups} />
+                  <ListItem label={intl.formatMessage(messages.backups)} to='/settings/backups' />
                 )}
 
                 {features.federating && (features.accountMoving ? (
-                  <ListItem label={intl.formatMessage(messages.accountMigration)} onClick={navigateToMoveAccount} />
+                  <ListItem label={intl.formatMessage(messages.accountMigration)} to='/settings/migrations' />
                 ) : features.accountAliases && (
-                  <ListItem label={intl.formatMessage(messages.accountAliases)} onClick={navigateToAliases} />
+                  <ListItem label={intl.formatMessage(messages.accountAliases)} to='/settings/aliases' />
                 ))}
 
                 {features.security && (
-                  <ListItem label={intl.formatMessage(messages.deleteAccount)} onClick={navigateToDeleteAccount} />
+                  <ListItem label={<Text theme='danger'>{intl.formatMessage(messages.deleteAccount)}</Text>} to='/settings/account' />
                 )}
               </List>
             </CardBody>

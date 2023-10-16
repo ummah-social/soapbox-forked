@@ -1,40 +1,45 @@
 'use strict';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { HotKeys } from 'react-hotkeys';
-import { useIntl } from 'react-intl';
+import clsx from 'clsx';
+import React, { useEffect, useRef } from 'react';
 import { Switch, useHistory, useLocation, Redirect } from 'react-router-dom';
 
 import { fetchFollowRequests } from 'soapbox/actions/accounts';
 import { fetchReports, fetchUsers, fetchConfig } from 'soapbox/actions/admin';
 import { fetchAnnouncements } from 'soapbox/actions/announcements';
-import { uploadCompose, resetCompose } from 'soapbox/actions/compose';
 import { fetchCustomEmojis } from 'soapbox/actions/custom-emojis';
-import { uploadEventBanner } from 'soapbox/actions/events';
 import { fetchFilters } from 'soapbox/actions/filters';
 import { fetchMarker } from 'soapbox/actions/markers';
 import { openModal } from 'soapbox/actions/modals';
 import { expandNotifications } from 'soapbox/actions/notifications';
 import { register as registerPushNotifications } from 'soapbox/actions/push-notifications';
 import { fetchScheduledStatuses } from 'soapbox/actions/scheduled-statuses';
-import { connectUserStream } from 'soapbox/actions/streaming';
 import { fetchSuggestionsForTimeline } from 'soapbox/actions/suggestions';
 import { expandHomeTimeline } from 'soapbox/actions/timelines';
+import { useUserStream } from 'soapbox/api/hooks';
+import { useSignerStream } from 'soapbox/api/hooks/nostr/useSignerStream';
+import GroupLookupHoc from 'soapbox/components/hoc/group-lookup-hoc';
+import withHoc from 'soapbox/components/hoc/with-hoc';
 import SidebarNavigation from 'soapbox/components/sidebar-navigation';
 import ThumbNavigation from 'soapbox/components/thumb-navigation';
 import { Layout } from 'soapbox/components/ui';
-import { useStatContext } from 'soapbox/contexts/stat-context';
-import { useAppDispatch, useAppSelector, useOwnAccount, useSoapboxConfig, useFeatures, useInstance } from 'soapbox/hooks';
+import { useAppDispatch, useAppSelector, useOwnAccount, useSoapboxConfig, useFeatures, useDraggedFiles } from 'soapbox/hooks';
 import AdminPage from 'soapbox/pages/admin-page';
 import ChatsPage from 'soapbox/pages/chats-page';
 import DefaultPage from 'soapbox/pages/default-page';
 import EventPage from 'soapbox/pages/event-page';
+import EventsPage from 'soapbox/pages/events-page';
+import GroupPage from 'soapbox/pages/group-page';
+import GroupsPage from 'soapbox/pages/groups-page';
+import GroupsPendingPage from 'soapbox/pages/groups-pending-page';
 import HomePage from 'soapbox/pages/home-page';
+import ManageGroupsPage from 'soapbox/pages/manage-groups-page';
 import ProfilePage from 'soapbox/pages/profile-page';
 import RemoteInstancePage from 'soapbox/pages/remote-instance-page';
+import SearchPage from 'soapbox/pages/search-page';
 import StatusPage from 'soapbox/pages/status-page';
 import { usePendingPolicy } from 'soapbox/queries/policies';
-import { getAccessToken, getVapidKey } from 'soapbox/utils/auth';
+import { getVapidKey } from 'soapbox/utils/auth';
 import { isStandalone } from 'soapbox/utils/state';
 
 import BackgroundShapes from './components/background-shapes';
@@ -63,13 +68,13 @@ import {
   DomainBlocks,
   Mutes,
   Filters,
+  EditFilter,
   PinnedStatuses,
   Search,
   ListTimeline,
   Lists,
   Bookmarks,
   Settings,
-  MediaDisplay,
   EditProfile,
   EditEmail,
   EditPassword,
@@ -94,7 +99,6 @@ import {
   FollowRecommendations,
   Directory,
   SidebarMenu,
-  UploadArea,
   ProfileHoverCard,
   StatusHoverCard,
   Share,
@@ -112,42 +116,43 @@ import {
   EventInformation,
   EventDiscussion,
   Events,
+  GroupGallery,
+  Groups,
+  GroupsDiscover,
+  GroupsPopular,
+  GroupsSuggested,
+  GroupsTag,
+  GroupsTags,
+  PendingGroupRequests,
+  GroupMembers,
+  GroupTags,
+  GroupTagTimeline,
+  GroupTimeline,
+  ManageGroup,
+  GroupBlockedMembers,
+  GroupMembershipRequests,
+  Announcements,
+  EditGroup,
+  FollowedTags,
 } from './util/async-components';
+import GlobalHotkeys from './util/global-hotkeys';
 import { WrappedRoute } from './util/react-router-helpers';
 
 // Dummy import, to make sure that <Status /> ends up in the application bundle.
 // Without this it ends up in ~8 very commonly used bundles.
 import 'soapbox/components/status';
 
-const EmptyPage = HomePage;
+const GroupTagsSlug = withHoc(GroupTags as any, GroupLookupHoc);
+const GroupTagTimelineSlug = withHoc(GroupTagTimeline as any, GroupLookupHoc);
+const GroupTimelineSlug = withHoc(GroupTimeline as any, GroupLookupHoc);
+const GroupMembersSlug = withHoc(GroupMembers as any, GroupLookupHoc);
+const GroupGallerySlug = withHoc(GroupGallery as any, GroupLookupHoc);
+const ManageGroupSlug = withHoc(ManageGroup as any, GroupLookupHoc);
+const EditGroupSlug = withHoc(EditGroup as any, GroupLookupHoc);
+const GroupBlockedMembersSlug = withHoc(GroupBlockedMembers as any, GroupLookupHoc);
+const GroupMembershipRequestsSlug = withHoc(GroupMembershipRequests as any, GroupLookupHoc);
 
-const keyMap = {
-  help: '?',
-  new: 'n',
-  search: 's',
-  forceNew: 'option+n',
-  reply: 'r',
-  favourite: 'f',
-  react: 'e',
-  boost: 'b',
-  mention: 'm',
-  open: ['enter', 'o'],
-  openProfile: 'p',
-  moveDown: ['down', 'j'],
-  moveUp: ['up', 'k'],
-  back: 'backspace',
-  goToHome: 'g h',
-  goToNotifications: 'g n',
-  goToFavourites: 'g f',
-  goToPinned: 'g p',
-  goToProfile: 'g u',
-  goToBlocked: 'g b',
-  goToMuted: 'g m',
-  goToRequests: 'g r',
-  toggleHidden: 'x',
-  toggleSensitive: 'h',
-  openMedia: 'a',
-};
+const EmptyPage = HomePage;
 
 interface ISwitchingColumnsArea {
   children: React.ReactNode
@@ -243,10 +248,10 @@ const SwitchingColumnsArea: React.FC<ISwitchingColumnsArea> = ({ children }) => 
 
       <WrappedRoute path='/notifications' page={DefaultPage} component={Notifications} content={children} />
 
-      <WrappedRoute path='/search' page={DefaultPage} component={Search} content={children} />
+      <WrappedRoute path='/search' page={SearchPage} component={Search} content={children} />
       {features.suggestions && <WrappedRoute path='/suggestions' publicRoute page={DefaultPage} component={FollowRecommendations} content={children} />}
       {features.profileDirectory && <WrappedRoute path='/directory' publicRoute page={DefaultPage} component={Directory} content={children} />}
-      {features.events && <WrappedRoute path='/events' page={DefaultPage} component={Events} content={children} />}
+      {features.events && <WrappedRoute path='/events' page={EventsPage} component={Events} content={children} />}
 
       {features.chats && <WrappedRoute path='/chats' exact page={ChatsPage} component={ChatIndex} content={children} />}
       {features.chats && <WrappedRoute path='/chats/new' page={ChatsPage} component={ChatIndex} content={children} />}
@@ -257,7 +262,10 @@ const SwitchingColumnsArea: React.FC<ISwitchingColumnsArea> = ({ children }) => 
       <WrappedRoute path='/blocks' page={DefaultPage} component={Blocks} content={children} />
       {features.federating && <WrappedRoute path='/domain_blocks' page={DefaultPage} component={DomainBlocks} content={children} />}
       <WrappedRoute path='/mutes' page={DefaultPage} component={Mutes} content={children} />
-      {features.filters && <WrappedRoute path='/filters' page={DefaultPage} component={Filters} content={children} />}
+      {(features.filters || features.filtersV2) && <WrappedRoute path='/filters/new' page={DefaultPage} component={EditFilter} content={children} />}
+      {(features.filters || features.filtersV2) && <WrappedRoute path='/filters/:id' page={DefaultPage} component={EditFilter} content={children} />}
+      {(features.filters || features.filtersV2) && <WrappedRoute path='/filters' page={DefaultPage} component={Filters} content={children} />}
+      {(features.followedHashtagsList) && <WrappedRoute path='/followed_tags' page={DefaultPage} component={FollowedTags} content={children} />}
       <WrappedRoute path='/@:username' publicRoute exact component={AccountTimeline} page={ProfilePage} content={children} />
       <WrappedRoute path='/@:username/with_replies' publicRoute={!authenticatedProfile} component={AccountTimeline} page={ProfilePage} content={children} componentParams={{ withReplies: true }} />
       <WrappedRoute path='/@:username/followers' publicRoute={!authenticatedProfile} component={Followers} page={ProfilePage} content={children} />
@@ -272,6 +280,36 @@ const SwitchingColumnsArea: React.FC<ISwitchingColumnsArea> = ({ children }) => 
       {features.events && <WrappedRoute path='/@:username/events/:statusId/discussion' publicRoute exact page={EventPage} component={EventDiscussion} content={children} />}
       <Redirect from='/@:username/:statusId' to='/@:username/posts/:statusId' />
 
+      {features.groups && <WrappedRoute path='/groups' exact page={GroupsPage} component={Groups} content={children} />}
+      {features.groupsDiscovery && <WrappedRoute path='/groups/discover' exact page={GroupsPage} component={GroupsDiscover} content={children} />}
+      {features.groupsDiscovery && <WrappedRoute path='/groups/popular' exact page={GroupsPendingPage} component={GroupsPopular} content={children} />}
+      {features.groupsDiscovery && <WrappedRoute path='/groups/suggested' exact page={GroupsPendingPage} component={GroupsSuggested} content={children} />}
+      {features.groupsDiscovery && <WrappedRoute path='/groups/tags' exact page={GroupsPendingPage} component={GroupsTags} content={children} />}
+      {features.groupsDiscovery && <WrappedRoute path='/groups/discover/tags/:id' exact page={GroupsPendingPage} component={GroupsTag} content={children} />}
+      {features.groupsPending && <WrappedRoute path='/groups/pending-requests' exact page={GroupsPendingPage} component={PendingGroupRequests} content={children} />}
+      {features.groupsTags && <WrappedRoute path='/groups/:groupId/tags' exact page={GroupPage} component={GroupTags} content={children} />}
+      {features.groupsTags && <WrappedRoute path='/groups/:groupId/tag/:id' exact page={GroupsPendingPage} component={GroupTagTimeline} content={children} />}
+      {features.groups && <WrappedRoute path='/groups/:groupId' exact page={GroupPage} component={GroupTimeline} content={children} />}
+      {features.groups && <WrappedRoute path='/groups/:groupId/members' exact page={GroupPage} component={GroupMembers} content={children} />}
+      {features.groups && <WrappedRoute path='/groups/:groupId/media' publicRoute={!authenticatedProfile} component={GroupGallery} page={GroupPage} content={children} />}
+      {features.groups && <WrappedRoute path='/groups/:groupId/manage' exact page={ManageGroupsPage} component={ManageGroup} content={children} />}
+      {features.groups && <WrappedRoute path='/groups/:groupId/manage/edit' exact page={ManageGroupsPage} component={EditGroup} content={children} />}
+      {features.groups && <WrappedRoute path='/groups/:groupId/manage/blocks' exact page={ManageGroupsPage} component={GroupBlockedMembers} content={children} />}
+      {features.groups && <WrappedRoute path='/groups/:groupId/manage/requests' exact page={ManageGroupsPage} component={GroupMembershipRequests} content={children} />}
+      {features.groups && <WrappedRoute path='/groups/:groupId/posts/:statusId' exact page={StatusPage} component={Status} content={children} />}
+
+      {features.groupsTags && <WrappedRoute path='/group/:groupSlug/tags' exact page={GroupPage} component={GroupTagsSlug} content={children} />}
+      {features.groupsTags && <WrappedRoute path='/group/:groupSlug/tag/:tagId' exact page={GroupsPendingPage} component={GroupTagTimelineSlug} content={children} />}
+      {features.groups && <WrappedRoute path='/group/:groupSlug' publicRoute exact page={GroupPage} component={GroupTimelineSlug} content={children} />}
+      {features.groups && <WrappedRoute path='/group/:groupSlug/members' exact page={GroupPage} component={GroupMembersSlug} content={children} />}
+      {features.groups && <WrappedRoute path='/group/:groupSlug/media' publicRoute={!authenticatedProfile} component={GroupGallerySlug} page={GroupPage} content={children} />}
+      {features.groups && <WrappedRoute path='/group/:groupSlug/manage' exact page={ManageGroupsPage} component={ManageGroupSlug} content={children} />}
+      {features.groups && <WrappedRoute path='/group/:groupSlug/manage/edit' exact page={ManageGroupsPage} component={EditGroupSlug} content={children} />}
+      {features.groups && <WrappedRoute path='/group/:groupSlug/manage/blocks' exact page={ManageGroupsPage} component={GroupBlockedMembersSlug} content={children} />}
+      {features.groups && <WrappedRoute path='/group/:groupSlug/manage/requests' exact page={ManageGroupsPage} component={GroupMembershipRequestsSlug} content={children} />}
+      {features.groups && <WrappedRoute path='/group/:groupSlug/posts/:statusId' exact page={StatusPage} component={Status} content={children} />}
+      {features.groups && <Redirect from='/group/:groupSlug/statuses/:statusId' to='/group/:groupSlug/posts/:statusId' />}
+
       <WrappedRoute path='/statuses/new' page={DefaultPage} component={NewStatus} content={children} exact />
       <WrappedRoute path='/statuses/:statusId' exact page={StatusPage} component={Status} content={children} />
       {features.scheduledStatuses && <WrappedRoute path='/scheduled_statuses' page={DefaultPage} component={ScheduledStatuses} content={children} />}
@@ -285,7 +323,6 @@ const SwitchingColumnsArea: React.FC<ISwitchingColumnsArea> = ({ children }) => 
       <WrappedRoute path='/settings/email' page={DefaultPage} component={EditEmail} content={children} />
       <WrappedRoute path='/settings/password' page={DefaultPage} component={EditPassword} content={children} />
       <WrappedRoute path='/settings/account' page={DefaultPage} component={DeleteAccount} content={children} />
-      <WrappedRoute path='/settings/media_display' page={DefaultPage} component={MediaDisplay} content={children} />
       <WrappedRoute path='/settings/mfa' page={DefaultPage} component={MfaForm} exact />
       <WrappedRoute path='/settings/tokens' page={DefaultPage} component={AuthTokenList} content={children} />
       <WrappedRoute path='/settings' page={DefaultPage} component={Settings} content={children} />
@@ -297,6 +334,7 @@ const SwitchingColumnsArea: React.FC<ISwitchingColumnsArea> = ({ children }) => 
       <WrappedRoute path='/soapbox/admin/log' staffOnly page={AdminPage} component={ModerationLog} content={children} exact />
       <WrappedRoute path='/soapbox/admin/users' staffOnly page={AdminPage} component={UserIndex} content={children} exact />
       <WrappedRoute path='/soapbox/admin/theme' staffOnly page={AdminPage} component={ThemeEditor} content={children} exact />
+      <WrappedRoute path='/soapbox/admin/announcements' staffOnly page={AdminPage} component={Announcements} content={children} exact />
       <WrappedRoute path='/info' page={EmptyPage} component={ServerInfo} content={children} />
 
       <WrappedRoute path='/developers/apps/create' developerOnly page={DefaultPage} component={CreateApp} content={children} />
@@ -322,98 +360,19 @@ interface IUI {
 }
 
 const UI: React.FC<IUI> = ({ children }) => {
-  const intl = useIntl();
   const history = useHistory();
   const dispatch = useAppDispatch();
   const { data: pendingPolicy } = usePendingPolicy();
-  const instance = useInstance();
-  const statContext = useStatContext();
-
-  const [draggingOver, setDraggingOver] = useState<boolean>(false);
-
-  const dragTargets = useRef<EventTarget[]>([]);
-  const disconnect = useRef<any>(null);
   const node = useRef<HTMLDivElement | null>(null);
-  const hotkeys = useRef<HTMLDivElement | null>(null);
-
   const me = useAppSelector(state => state.me);
-  const account = useOwnAccount();
+  const { account } = useOwnAccount();
   const features = useFeatures();
   const vapidKey = useAppSelector(state => getVapidKey(state));
 
-  const dropdownMenuIsOpen = useAppSelector(state => state.dropdown_menu.openId !== null);
-  const accessToken = useAppSelector(state => getAccessToken(state));
-  const streamingUrl = instance.urls.get('streaming_api');
+  const dropdownMenuIsOpen = useAppSelector(state => state.dropdown_menu.isOpen);
   const standalone = useAppSelector(isStandalone);
 
-  const handleDragEnter = (e: DragEvent) => {
-    e.preventDefault();
-
-    if (e.target && !dragTargets.current.includes(e.target)) {
-      dragTargets.current.push(e.target);
-    }
-
-    if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) {
-      setDraggingOver(true);
-    }
-  };
-
-  const handleDragOver = (e: DragEvent) => {
-    if (dataTransferIsText(e.dataTransfer)) return false;
-    e.preventDefault();
-    e.stopPropagation();
-
-    try {
-      if (e.dataTransfer) {
-        e.dataTransfer.dropEffect = 'copy';
-      }
-    } catch (err) {
-      // Do nothing
-    }
-
-    return false;
-  };
-
-  const handleDrop = (e: DragEvent) => {
-    if (!me) return;
-
-    if (dataTransferIsText(e.dataTransfer)) return;
-    e.preventDefault();
-
-    setDraggingOver(false);
-    dragTargets.current = [];
-
-    dispatch((_, getState) => {
-      if (e.dataTransfer && e.dataTransfer.files.length >= 1) {
-        const modals = getState().modals;
-        const isModalOpen = modals.last()?.modalType === 'COMPOSE';
-        const isEventsModalOpen = modals.last()?.modalType === 'COMPOSE_EVENT';
-        if (isEventsModalOpen) dispatch(uploadEventBanner(e.dataTransfer.files[0], intl));
-        else dispatch(uploadCompose(isModalOpen ? 'compose-modal' : 'home', e.dataTransfer.files, intl));
-      }
-    });
-  };
-
-  const handleDragLeave = (e: DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    dragTargets.current = dragTargets.current.filter(el => el !== e.target && node.current?.contains(el as Node));
-
-    if (dragTargets.current.length > 0) {
-      return;
-    }
-
-    setDraggingOver(false);
-  };
-
-  const dataTransferIsText = (dataTransfer: DataTransfer | null) => {
-    return (dataTransfer && Array.from(dataTransfer.types).includes('text/plain') && dataTransfer.items.length === 1);
-  };
-
-  const closeUploadModal = () => {
-    setDraggingOver(false);
-  };
+  const { isDragging } = useDraggedFiles(node);
 
   const handleServiceWorkerPostMessage = ({ data }: MessageEvent) => {
     if (data.type === 'navigate') {
@@ -423,18 +382,10 @@ const UI: React.FC<IUI> = ({ children }) => {
     }
   };
 
-  const connectStreaming = () => {
-    if (!disconnect.current && accessToken && streamingUrl) {
-      disconnect.current = dispatch(connectUserStream({ statContext }));
-    }
-  };
-
-  const disconnectStreaming = () => {
-    if (disconnect.current) {
-      disconnect.current();
-      disconnect.current = null;
-    }
-  };
+  const handleDragEnter = (e: DragEvent) => e.preventDefault();
+  const handleDragLeave = (e: DragEvent) => e.preventDefault();
+  const handleDragOver = (e: DragEvent) => e.preventDefault();
+  const handleDrop = (e: DragEvent) => e.preventDefault();
 
   /** Load initial data when a user is logged in */
   const loadAccountData = () => {
@@ -470,11 +421,6 @@ const UI: React.FC<IUI> = ({ children }) => {
   };
 
   useEffect(() => {
-    document.addEventListener('dragenter', handleDragEnter, false);
-    document.addEventListener('dragover', handleDragOver, false);
-    document.addEventListener('drop', handleDrop, false);
-    document.addEventListener('dragleave', handleDragLeave, false);
-
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('message', handleServiceWorkerPostMessage);
     }
@@ -482,19 +428,23 @@ const UI: React.FC<IUI> = ({ children }) => {
     if (window.Notification?.permission === 'default') {
       window.setTimeout(() => Notification.requestPermission(), 120 * 1000);
     }
-
-    return () => {
-      document.removeEventListener('dragenter', handleDragEnter);
-      document.removeEventListener('dragover', handleDragOver);
-      document.removeEventListener('drop', handleDrop);
-      document.removeEventListener('dragleave', handleDragLeave);
-      disconnectStreaming();
-    };
   }, []);
 
   useEffect(() => {
-    connectStreaming();
-  }, [accessToken, streamingUrl]);
+    document.addEventListener('dragenter', handleDragEnter);
+    document.addEventListener('dragleave', handleDragLeave);
+    document.addEventListener('dragover', handleDragOver);
+    document.addEventListener('drop', handleDrop);
+    return () => {
+      document.removeEventListener('dragenter', handleDragEnter);
+      document.removeEventListener('dragleave', handleDragLeave);
+      document.removeEventListener('dragover', handleDragOver);
+      document.removeEventListener('drop', handleDrop);
+    };
+  }, []);
+
+  useUserStream();
+  useSignerStream();
 
   // The user has logged in
   useEffect(() => {
@@ -514,91 +464,6 @@ const UI: React.FC<IUI> = ({ children }) => {
     }
   }, [pendingPolicy, !!account]);
 
-  const handleHotkeyNew = (e?: KeyboardEvent) => {
-    e?.preventDefault();
-    if (!node.current) return;
-
-    const element = node.current.querySelector('textarea#compose-textarea') as HTMLTextAreaElement;
-
-    if (element) {
-      element.focus();
-    }
-  };
-
-  const handleHotkeySearch = (e?: KeyboardEvent) => {
-    e?.preventDefault();
-    if (!node.current) return;
-
-    const element = node.current.querySelector('input#search') as HTMLInputElement;
-
-    if (element) {
-      element.focus();
-    }
-  };
-
-  const handleHotkeyForceNew = (e?: KeyboardEvent) => {
-    handleHotkeyNew(e);
-    dispatch(resetCompose());
-  };
-
-  const handleHotkeyBack = () => {
-    if (window.history && window.history.length === 1) {
-      history.push('/');
-    } else {
-      history.goBack();
-    }
-  };
-
-  const setHotkeysRef: React.LegacyRef<HotKeys> = (c: any) => {
-    hotkeys.current = c;
-
-    if (!me || !hotkeys.current) return;
-
-    // @ts-ignore
-    hotkeys.current.__mousetrap__.stopCallback = (_e, element) => {
-      return ['TEXTAREA', 'SELECT', 'INPUT'].includes(element.tagName);
-    };
-  };
-
-  const handleHotkeyToggleHelp = () => {
-    dispatch(openModal('HOTKEYS'));
-  };
-
-  const handleHotkeyGoToHome = () => {
-    history.push('/');
-  };
-
-  const handleHotkeyGoToNotifications = () => {
-    history.push('/notifications');
-  };
-
-  const handleHotkeyGoToFavourites = () => {
-    if (!account) return;
-    history.push(`/@${account.username}/favorites`);
-  };
-
-  const handleHotkeyGoToPinned = () => {
-    if (!account) return;
-    history.push(`/@${account.username}/pins`);
-  };
-
-  const handleHotkeyGoToProfile = () => {
-    if (!account) return;
-    history.push(`/@${account.username}`);
-  };
-
-  const handleHotkeyGoToBlocked = () => {
-    history.push('/blocks');
-  };
-
-  const handleHotkeyGoToMuted = () => {
-    history.push('/mutes');
-  };
-
-  const handleHotkeyGoToRequests = () => {
-    history.push('/follow_requests');
-  };
-
   const shouldHideFAB = (): boolean => {
     const path = location.pathname;
     return Boolean(path.match(/^\/posts\/|^\/search|^\/getting-started|^\/chats/));
@@ -607,31 +472,19 @@ const UI: React.FC<IUI> = ({ children }) => {
   // Wait for login to succeed or fail
   if (me === null) return null;
 
-  type HotkeyHandlers = { [key: string]: (keyEvent?: KeyboardEvent) => void };
-
-  const handlers: HotkeyHandlers = {
-    help: handleHotkeyToggleHelp,
-    new: handleHotkeyNew,
-    search: handleHotkeySearch,
-    forceNew: handleHotkeyForceNew,
-    back: handleHotkeyBack,
-    goToHome: handleHotkeyGoToHome,
-    goToNotifications: handleHotkeyGoToNotifications,
-    goToFavourites: handleHotkeyGoToFavourites,
-    goToPinned: handleHotkeyGoToPinned,
-    goToProfile: handleHotkeyGoToProfile,
-    goToBlocked: handleHotkeyGoToBlocked,
-    goToMuted: handleHotkeyGoToMuted,
-    goToRequests: handleHotkeyGoToRequests,
-  };
-
   const style: React.CSSProperties = {
     pointerEvents: dropdownMenuIsOpen ? 'none' : undefined,
   };
 
   return (
-    <HotKeys keyMap={keyMap} handlers={me ? handlers : undefined} ref={setHotkeysRef} attach={window} focused>
+    <GlobalHotkeys node={node}>
       <div ref={node} style={style}>
+        <div
+          className={clsx('pointer-events-none fixed z-[90] h-screen w-screen transition', {
+            'backdrop-blur': isDragging,
+          })}
+        />
+
         <BackgroundShapes />
 
         <div className='z-10 flex flex-col'>
@@ -648,14 +501,10 @@ const UI: React.FC<IUI> = ({ children }) => {
           </Layout>
 
           {(me && !shouldHideFAB()) && (
-            <div className='z-40 lg:hidden transition-all fixed bottom-24 right-4 rtl:left-4 rtl:right-auto'>
+            <div className='fixed bottom-24 right-4 z-40 transition-all rtl:left-4 rtl:right-auto lg:hidden'>
               <FloatingActionButton />
             </div>
           )}
-
-          <BundleContainer fetchComponent={UploadArea}>
-            {Component => <Component active={draggingOver} onClose={closeUploadModal} />}
-          </BundleContainer>
 
           {me && (
             <BundleContainer fetchComponent={SidebarMenu}>
@@ -683,7 +532,7 @@ const UI: React.FC<IUI> = ({ children }) => {
           </BundleContainer>
         </div>
       </div>
-    </HotKeys>
+    </GlobalHotkeys>
   );
 };
 

@@ -42,7 +42,7 @@ const messages = defineMessages({
 });
 
 interface IVerifySmsModal {
-  onClose: (type: string) => void,
+  onClose: (type: string) => void
 }
 
 enum Statuses {
@@ -177,6 +177,7 @@ const VerifySmsModal: React.FC<IVerifySmsModal> = ({ onClose }) => {
   };
 
   const submitVerification = () => {
+    if (!accessToken) return;
     // TODO: handle proper validation from Pepe -- expired vs invalid
     dispatch(reConfirmPhoneVerification(verificationCode))
       .then(() => {

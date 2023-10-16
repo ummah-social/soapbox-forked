@@ -1,5 +1,4 @@
-import { List as ImmutableList } from 'immutable';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { defineMessages, useIntl, FormattedMessage } from 'react-intl';
 
 import { updateNotificationSettings } from 'soapbox/actions/accounts';
@@ -9,7 +8,6 @@ import List, { ListItem } from 'soapbox/components/list';
 import {
   Button,
   Column,
-  FileInput,
   Form,
   FormActions,
   FormGroup,
@@ -19,23 +17,32 @@ import {
   Textarea,
   Toggle,
 } from 'soapbox/components/ui';
-import { useAppDispatch, useOwnAccount, useFeatures, useInstance } from 'soapbox/hooks';
-import { normalizeAccount } from 'soapbox/normalizers';
+import { useAppDispatch, useOwnAccount, useFeatures, useInstance, useAppSelector } from 'soapbox/hooks';
+import { useImageField } from 'soapbox/hooks/forms';
 import toast from 'soapbox/toast';
-import resizeImage from 'soapbox/utils/resize-image';
+import { isDefaultAvatar, isDefaultHeader } from 'soapbox/utils/accounts';
 
-import ProfilePreview from './components/profile-preview';
+import AvatarPicker from './components/avatar-picker';
+import HeaderPicker from './components/header-picker';
 
+import type { List as ImmutableList } from 'immutable';
 import type { StreamfieldComponent } from 'soapbox/components/ui/streamfield/streamfield';
-import type { Account } from 'soapbox/types/entities';
+import type { Account } from 'soapbox/schemas';
+
+const nonDefaultAvatar = (url: string | undefined) => url && isDefaultAvatar(url) ? undefined : url;
+const nonDefaultHeader = (url: string | undefined) => url && isDefaultHeader(url) ? undefined : url;
 
 /**
  * Whether the user is hiding their follows and/or followers.
  * Pleroma's config is granular, but we simplify it into one setting.
  */
-const hidesNetwork = (account: Account): boolean => {
-  const { hide_followers, hide_follows, hide_followers_count, hide_follows_count } = account.pleroma.toJS();
-  return Boolean(hide_followers && hide_follows && hide_followers_count && hide_follows_count);
+const hidesNetwork = ({ pleroma }: Account): boolean => {
+  return Boolean(
+    pleroma?.hide_followers &&
+    pleroma?.hide_follows &&
+    pleroma?.hide_followers_count &&
+    pleroma?.hide_follows_count,
+  );
 };
 
 const messages = defineMessages({
@@ -57,18 +64,18 @@ const messages = defineMessages({
  * (By default, max 4 fields and 255 characters per property/value)
  */
 interface AccountCredentialsField {
-  name: string,
-  value: string,
+  name: string
+  value: string
 }
 
 /** Private information (settings) for the account. */
 interface AccountCredentialsSource {
   /** Default post privacy for authored statuses. */
-  privacy?: string,
+  privacy?: string
   /** Whether to mark authored statuses as sensitive by default. */
-  sensitive?: boolean,
+  sensitive?: boolean
   /** Default language to use for authored statuses. (ISO 6391) */
-  language?: string,
+  language?: string
 }
 
 /**
@@ -77,43 +84,43 @@ interface AccountCredentialsSource {
  */
 interface AccountCredentials {
   /** Whether the account should be shown in the profile directory. */
-  discoverable?: boolean,
+  discoverable?: boolean
   /** Whether the account has a bot flag. */
-  bot?: boolean,
+  bot?: boolean
   /** The display name to use for the profile. */
-  display_name?: string,
+  display_name?: string
   /** The account bio. */
-  note?: string,
+  note?: string
   /** Avatar image encoded using multipart/form-data */
-  avatar?: File,
+  avatar?: File | ''
   /** Header image encoded using multipart/form-data */
-  header?: File,
+  header?: File | ''
   /** Whether manual approval of follow requests is required. */
-  locked?: boolean,
+  locked?: boolean
   /** Private information (settings) about the account. */
-  source?: AccountCredentialsSource,
+  source?: AccountCredentialsSource
   /** Custom profile fields. */
-  fields_attributes?: AccountCredentialsField[],
+  fields_attributes?: AccountCredentialsField[]
 
   // Non-Mastodon fields
   /** Pleroma: whether to accept notifications from people you don't follow. */
-  stranger_notifications?: boolean,
+  stranger_notifications?: boolean
   /** Soapbox BE: whether the user opts-in to email communications. */
-  accepts_email_list?: boolean,
+  accepts_email_list?: boolean
   /** Pleroma: whether to publicly display followers. */
-  hide_followers?: boolean,
+  hide_followers?: boolean
   /** Pleroma: whether to publicly display follows. */
-  hide_follows?: boolean,
+  hide_follows?: boolean
   /** Pleroma: whether to publicly display follower count. */
-  hide_followers_count?: boolean,
+  hide_followers_count?: boolean
   /** Pleroma: whether to publicly display follows count. */
-  hide_follows_count?: boolean,
+  hide_follows_count?: boolean
   /** User's website URL. */
-  website?: string,
+  website?: string
   /** User's location. */
-  location?: string,
+  location?: string
   /** User's birthday. */
-  birthday?: string,
+  birthday?: string
 }
 
 /** Convert an account into an update_credentials request object. */
@@ -124,18 +131,18 @@ const accountToCredentials = (account: Account): AccountCredentials => {
     discoverable: account.discoverable,
     bot: account.bot,
     display_name: account.display_name,
-    note: account.source.get('note'),
+    note: account.source?.note ?? '',
     locked: account.locked,
-    fields_attributes: [...account.source.get<Iterable<AccountCredentialsField>>('fields', ImmutableList()).toJS()],
-    stranger_notifications: account.getIn(['pleroma', 'notification_settings', 'block_from_strangers']) === true,
-    accepts_email_list: account.getIn(['pleroma', 'accepts_email_list']) === true,
+    fields_attributes: [...account.source?.fields ?? []],
+    stranger_notifications: account.pleroma?.notification_settings?.block_from_strangers === true,
+    accepts_email_list: account.pleroma?.accepts_email_list === true,
     hide_followers: hideNetwork,
     hide_follows: hideNetwork,
     hide_followers_count: hideNetwork,
     hide_follows_count: hideNetwork,
     website: account.website,
     location: account.location,
-    birthday: account.birthday,
+    birthday: account.pleroma?.birthday ?? undefined,
   };
 };
 
@@ -152,14 +159,14 @@ const ProfileField: StreamfieldComponent<AccountCredentialsField> = ({ value, on
     <HStack space={2} grow>
       <Input
         type='text'
-        outerClassName='w-2/5 flex-grow'
+        outerClassName='w-2/5 grow'
         value={value.name}
         onChange={handleChange('name')}
         placeholder={intl.formatMessage(messages.metaFieldLabel)}
       />
       <Input
         type='text'
-        outerClassName='w-3/5 flex-grow'
+        outerClassName='w-3/5 grow'
         value={value.value}
         onChange={handleChange('value')}
         placeholder={intl.formatMessage(messages.metaFieldContent)}
@@ -174,18 +181,25 @@ const EditProfile: React.FC = () => {
   const dispatch = useAppDispatch();
   const instance = useInstance();
 
-  const account = useOwnAccount();
+  const { account } = useOwnAccount();
   const features = useFeatures();
   const maxFields = instance.pleroma.getIn(['metadata', 'fields_limits', 'max_fields'], 4) as number;
+
+  const attachmentTypes = useAppSelector(
+    state => state.instance.configuration.getIn(['media_attachments', 'supported_mime_types']) as ImmutableList<string>,
+  )?.filter(type => type.startsWith('image/')).toArray().join(',');
 
   const [isLoading, setLoading] = useState(false);
   const [data, setData] = useState<AccountCredentials>({});
   const [muteStrangers, setMuteStrangers] = useState(false);
 
+  const avatar = useImageField({ maxPixels: 400 * 400, preview: nonDefaultAvatar(account?.avatar) });
+  const header = useImageField({ maxPixels: 1920 * 1080, preview: nonDefaultHeader(account?.header) });
+
   useEffect(() => {
     if (account) {
       const credentials = accountToCredentials(account);
-      const strangerNotifications = account.getIn(['pleroma', 'notification_settings', 'block_from_strangers']) === true;
+      const strangerNotifications = account.pleroma?.notification_settings?.block_from_strangers === true;
       setData(credentials);
       setMuteStrangers(strangerNotifications);
     }
@@ -203,6 +217,8 @@ const EditProfile: React.FC = () => {
 
     const params = { ...data };
     if (params.fields_attributes?.length === 0) params.fields_attributes = [{ name: '', value: '' }];
+    if (header.file !== undefined) params.header = header.file || '';
+    if (avatar.file !== undefined) params.avatar = avatar.file || '';
 
     promises.push(dispatch(patchMe(params, true)));
 
@@ -256,20 +272,6 @@ const EditProfile: React.FC = () => {
     });
   };
 
-  const handleFileChange = (
-    name: keyof AccountCredentials,
-    maxPixels: number,
-  ): React.ChangeEventHandler<HTMLInputElement> => {
-    return e => {
-      const f = e.target.files?.item(0);
-      if (!f) return;
-
-      resizeImage(f, maxPixels).then(file => {
-        updateData(name, file);
-      }).catch(console.error);
-    };
-  };
-
   const handleFieldsChange = (fields: AccountCredentialsField[]) => {
     updateData('fields_attributes', fields);
   };
@@ -287,47 +289,12 @@ const EditProfile: React.FC = () => {
     updateData('fields_attributes', fields);
   };
 
-  /** Memoized avatar preview URL. */
-  const avatarUrl = useMemo(() => {
-    return data.avatar ? URL.createObjectURL(data.avatar) : account?.avatar;
-  }, [data.avatar, account?.avatar]);
-
-  /** Memoized header preview URL. */
-  const headerUrl = useMemo(() => {
-    return data.header ? URL.createObjectURL(data.header) : account?.header;
-  }, [data.header, account?.header]);
-
-  /** Preview account data. */
-  const previewAccount = useMemo(() => {
-    return normalizeAccount({
-      ...account?.toJS(),
-      ...data,
-      avatar: avatarUrl,
-      header: headerUrl,
-    }) as Account;
-  }, [account?.id, data.display_name, avatarUrl, headerUrl]);
-
   return (
     <Column label={intl.formatMessage(messages.header)}>
       <Form onSubmit={handleSubmit}>
-        <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-          <ProfilePreview account={previewAccount} />
-
-          <div className='space-y-4'>
-            <FormGroup
-              labelText={<FormattedMessage id='edit_profile.fields.header_label' defaultMessage='Choose Background Picture' />}
-              hintText={<FormattedMessage id='edit_profile.hints.header' defaultMessage='PNG, GIF or JPG. Will be downscaled to {size}' values={{ size: '1920x1080px' }} />}
-            >
-              <FileInput onChange={handleFileChange('header', 1920 * 1080)} />
-            </FormGroup>
-
-            <FormGroup
-              labelText={<FormattedMessage id='edit_profile.fields.avatar_label' defaultMessage='Choose Profile Picture' />}
-              hintText={<FormattedMessage id='edit_profile.hints.avatar' defaultMessage='PNG, GIF or JPG. Will be downscaled to {size}' values={{ size: '400x400px' }} />}
-            >
-              <FileInput onChange={handleFileChange('avatar', 400 * 400)} />
-            </FormGroup>
-          </div>
+        <div className='relative mb-12 flex'>
+          <HeaderPicker accept={attachmentTypes} disabled={isLoading} {...header} />
+          <AvatarPicker className='!sm:left-6 !left-4 !translate-x-0' accept={attachmentTypes} disabled={isLoading} {...avatar} />
         </div>
 
         <FormGroup

@@ -10,6 +10,7 @@ import LinkHeader from 'http-link-header';
 import { createSelector } from 'reselect';
 
 import * as BuildConfig from 'soapbox/build-config';
+import { selectAccount } from 'soapbox/selectors';
 import { RootState } from 'soapbox/store';
 import { getAccessToken, getAppToken, isURL, parseBaseURL } from 'soapbox/utils/auth';
 
@@ -29,6 +30,10 @@ export const getNextLink = (response: AxiosResponse): string | undefined => {
   return getLinks(response).refs.find(link => link.rel === 'next')?.uri;
 };
 
+export const getPrevLink = (response: AxiosResponse): string | undefined => {
+  return getLinks(response).refs.find(link => link.rel === 'prev')?.uri;
+};
+
 const getToken = (state: RootState, authType: string) => {
   return authType === 'app' ? getAppToken(state) : getAccessToken(state);
 };
@@ -42,7 +47,7 @@ const maybeParseJSON = (data: string) => {
 };
 
 const getAuthBaseURL = createSelector([
-  (state: RootState, me: string | false | null) => state.accounts.getIn([me, 'url']),
+  (state: RootState, me: string | false | null) => me ? selectAccount(state, me)?.url : undefined,
   (state: RootState, _me: string | false | null) => state.auth.me,
 ], (accountUrl, authUserUrl) => {
   const baseURL = parseBaseURL(accountUrl) || parseBaseURL(authUserUrl);
@@ -55,13 +60,25 @@ const getAuthBaseURL = createSelector([
   * @param {string} baseURL
   * @returns {object} Axios instance
   */
-export const baseClient = (accessToken?: string | null, baseURL: string = ''): AxiosInstance => {
+export const baseClient = (
+  accessToken?: string | null,
+  baseURL: string = '',
+  nostrSign = false,
+): AxiosInstance => {
+  const headers: Record<string, string> = {};
+
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  if (nostrSign) {
+    headers['X-Nostr-Sign'] = 'true';
+  }
+
   return axios.create({
     // When BACKEND_URL is set, always use it.
     baseURL: isURL(BuildConfig.BACKEND_URL) ? BuildConfig.BACKEND_URL : baseURL,
-    headers: Object.assign(accessToken ? {
-      'Authorization': `Bearer ${accessToken}`,
-    } : {}),
+    headers,
     transformResponse: [maybeParseJSON],
   });
 };
@@ -89,7 +106,11 @@ export default (getState: () => RootState, authType: string = 'user'): AxiosInst
   const me = state.me;
   const baseURL = me ? getAuthBaseURL(state, me) : '';
 
-  return baseClient(accessToken, baseURL);
+  const relayUrl = state.getIn(['instance', 'nostr', 'relay']) as string | undefined;
+  const pubkey = state.getIn(['instance', 'nostr', 'pubkey']) as string | undefined;
+  const nostrSign = Boolean(relayUrl && pubkey);
+
+  return baseClient(accessToken, baseURL, nostrSign);
 };
 
 // The Jest mock exports these, so they're needed for TypeScript.

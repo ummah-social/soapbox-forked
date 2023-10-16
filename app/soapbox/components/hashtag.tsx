@@ -10,7 +10,7 @@ import { HStack, Stack, Text } from './ui';
 import type { Tag } from 'soapbox/types/entities';
 
 interface IHashtag {
-  hashtag: Tag,
+  hashtag: Tag
 }
 
 const Hashtag: React.FC<IHashtag> = ({ hashtag }) => {
@@ -23,7 +23,7 @@ const Hashtag: React.FC<IHashtag> = ({ hashtag }) => {
           <Text tag='span' size='sm' weight='semibold'>#{hashtag.name}</Text>
         </Link>
 
-        {hashtag.history && (
+        {Boolean(count) && (
           <Text theme='muted' size='sm'>
             <FormattedMessage
               id='trends.count_by_accounts'

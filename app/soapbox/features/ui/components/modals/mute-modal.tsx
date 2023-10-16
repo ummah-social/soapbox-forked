@@ -1,21 +1,19 @@
 import React from 'react';
 import { FormattedMessage } from 'react-intl';
-import Toggle from 'react-toggle';
 
 import { muteAccount } from 'soapbox/actions/accounts';
 import { closeModal } from 'soapbox/actions/modals';
 import { toggleHideNotifications, changeMuteDuration } from 'soapbox/actions/mutes';
-import { Modal, HStack, Stack, Text } from 'soapbox/components/ui';
+import { useAccount } from 'soapbox/api/hooks';
+import { Modal, HStack, Stack, Text, Toggle } from 'soapbox/components/ui';
 import DurationSelector from 'soapbox/features/compose/components/polls/duration-selector';
 import { useAppDispatch, useAppSelector, useFeatures } from 'soapbox/hooks';
-import { makeGetAccount } from 'soapbox/selectors';
-
-const getAccount = makeGetAccount();
 
 const MuteModal = () => {
   const dispatch = useAppDispatch();
 
-  const account = useAppSelector((state) => getAccount(state, state.mutes.new.accountId!));
+  const accountId = useAppSelector((state) => state.mutes.new.accountId);
+  const { account } = useAccount(accountId || undefined);
   const notifications = useAppSelector((state) => state.mutes.new.notifications);
   const duration = useAppSelector((state) => state.mutes.new.duration);
   const mutesDuration = useFeatures().mutesDuration;
@@ -61,7 +59,7 @@ const MuteModal = () => {
           <FormattedMessage
             id='confirmations.mute.message'
             defaultMessage='Are you sure you want to mute {name}?'
-            values={{ name: <strong>@{account.acct}</strong> }}
+            values={{ name: <strong className='break-words'>@{account.acct}</strong> }}
           />
         </Text>
 
@@ -74,7 +72,6 @@ const MuteModal = () => {
             <Toggle
               checked={notifications}
               onChange={toggleNotifications}
-              icons={false}
             />
           </HStack>
         </label>
@@ -90,7 +87,6 @@ const MuteModal = () => {
                 <Toggle
                   checked={duration !== 0}
                   onChange={toggleAutoExpire}
-                  icons={false}
                 />
               </HStack>
             </label>

@@ -14,14 +14,13 @@ import { normalizeChat } from 'soapbox/normalizers';
 import { normalizeId } from 'soapbox/utils/normalizers';
 
 import type { AnyAction } from 'redux';
+import type { APIEntity } from 'soapbox/types/entities';
 
 type ChatRecord = ReturnType<typeof normalizeChat>;
-type APIEntity = Record<string, any>;
 type APIEntities = Array<APIEntity>;
 
 export interface ReducerChat extends ChatRecord {
-  account: string | null,
-  last_message: string | null,
+  last_message: string | null
 }
 
 const ReducerRecord = ImmutableRecord({
@@ -34,7 +33,6 @@ type State = ReturnType<typeof ReducerRecord>;
 
 const minifyChat = (chat: ChatRecord): ReducerChat => {
   return chat.mergeWith((o, n) => n || o, {
-    account: normalizeId(chat.getIn(['account', 'id'])),
     last_message: normalizeId(chat.getIn(['last_message', 'id'])),
   }) as ReducerChat;
 };

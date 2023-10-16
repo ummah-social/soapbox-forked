@@ -2,10 +2,10 @@ import React from 'react';
 import { defineMessages, useIntl } from 'react-intl';
 
 import {
-  followAccount,
   subscribeAccount,
   unsubscribeAccount,
 } from 'soapbox/actions/accounts';
+import { useFollow } from 'soapbox/api/hooks';
 import { IconButton } from 'soapbox/components/ui';
 import { useAppDispatch, useFeatures } from 'soapbox/hooks';
 import toast from 'soapbox/toast';
@@ -22,22 +22,23 @@ const messages = defineMessages({
 });
 
 interface ISubscriptionButton {
-  account: AccountEntity
+  account: Pick<AccountEntity, 'id' | 'username' | 'relationship'>
 }
 
 const SubscriptionButton = ({ account }: ISubscriptionButton) => {
   const dispatch = useAppDispatch();
   const features = useFeatures();
   const intl = useIntl();
+  const { follow } = useFollow();
 
   const isFollowing = account.relationship?.following;
   const isRequested = account.relationship?.requested;
-  const isSubscribed = features.accountNotifies ?
-    account.relationship?.notifying :
-    account.relationship?.subscribing;
-  const title = isSubscribed ?
-    intl.formatMessage(messages.unsubscribe, { name: account.get('username') }) :
-    intl.formatMessage(messages.subscribe, { name: account.get('username') });
+  const isSubscribed = features.accountNotifies
+    ? account.relationship?.notifying
+    : account.relationship?.subscribing;
+  const title = isSubscribed
+    ? intl.formatMessage(messages.unsubscribe, { name: account.username })
+    : intl.formatMessage(messages.subscribe, { name: account.username });
 
   const onSubscribeSuccess = () =>
     toast.success(intl.formatMessage(messages.subscribeSuccess));
@@ -53,11 +54,11 @@ const SubscriptionButton = ({ account }: ISubscriptionButton) => {
 
   const onNotifyToggle = () => {
     if (account.relationship?.notifying) {
-      dispatch(followAccount(account.get('id'), { notify: false } as any))
+      follow(account.id, { notify: false })
         ?.then(() => onUnsubscribeSuccess())
         .catch(() => onUnsubscribeFailure());
     } else {
-      dispatch(followAccount(account.get('id'), { notify: true } as any))
+      follow(account.id, { notify: true })
         ?.then(() => onSubscribeSuccess())
         .catch(() => onSubscribeFailure());
     }
@@ -65,11 +66,11 @@ const SubscriptionButton = ({ account }: ISubscriptionButton) => {
 
   const onSubscriptionToggle = () => {
     if (account.relationship?.subscribing) {
-      dispatch(unsubscribeAccount(account.get('id')))
+      dispatch(unsubscribeAccount(account.id))
         ?.then(() => onUnsubscribeSuccess())
         .catch(() => onUnsubscribeFailure());
     } else {
-      dispatch(subscribeAccount(account.get('id')))
+      dispatch(subscribeAccount(account.id))
         ?.then(() => onSubscribeSuccess())
         .catch(() => onSubscribeFailure());
     }
@@ -95,7 +96,7 @@ const SubscriptionButton = ({ account }: ISubscriptionButton) => {
         title={title}
         theme='outlined'
         className='px-2'
-        iconClassName='w-4 h-4'
+        iconClassName='h-4 w-4'
       />
     );
   }

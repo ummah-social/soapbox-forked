@@ -1,12 +1,12 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { FormattedMessage } from 'react-intl';
 import { useHistory } from 'react-router-dom';
 
-import { connectRemoteStream } from 'soapbox/actions/streaming';
 import { expandRemoteTimeline } from 'soapbox/actions/timelines';
+import { useRemoteStream } from 'soapbox/api/hooks';
 import IconButton from 'soapbox/components/icon-button';
 import { Column, HStack, Text } from 'soapbox/components/ui';
-import { useAppDispatch, useSettings } from 'soapbox/hooks';
+import { useAppSelector, useAppDispatch, useSettings } from 'soapbox/hooks';
 
 import Timeline from '../ui/components/timeline';
 
@@ -14,7 +14,7 @@ import PinnedHostsPicker from './components/pinned-hosts-picker';
 
 interface IRemoteTimeline {
   params?: {
-    instance?: string,
+    instance?: string
   }
 }
 
@@ -26,36 +26,24 @@ const RemoteTimeline: React.FC<IRemoteTimeline> = ({ params }) => {
   const instance = params?.instance as string;
   const settings = useSettings();
 
-  const stream = useRef<any>(null);
-
   const timelineId = 'remote';
   const onlyMedia = !!settings.getIn(['remote', 'other', 'onlyMedia']);
+  const next = useAppSelector(state => state.timelines.get('remote')?.next);
 
   const pinned: boolean = (settings.getIn(['remote_timeline', 'pinnedHosts']) as any).includes(instance);
-
-  const disconnect = () => {
-    if (stream.current) {
-      stream.current();
-    }
-  };
 
   const handleCloseClick: React.MouseEventHandler = () => {
     history.push('/timeline/fediverse');
   };
 
   const handleLoadMore = (maxId: string) => {
-    dispatch(expandRemoteTimeline(instance, { maxId, onlyMedia }));
+    dispatch(expandRemoteTimeline(instance, { url: next, maxId, onlyMedia }));
   };
 
-  useEffect(() => {
-    disconnect();
-    dispatch(expandRemoteTimeline(instance, { onlyMedia, maxId: undefined }));
-    stream.current = dispatch(connectRemoteStream(instance, { onlyMedia }));
+  useRemoteStream({ instance, onlyMedia });
 
-    return () => {
-      disconnect();
-      stream.current = null;
-    };
+  useEffect(() => {
+    dispatch(expandRemoteTimeline(instance, { onlyMedia, maxId: undefined }));
   }, [onlyMedia]);
 
   return (

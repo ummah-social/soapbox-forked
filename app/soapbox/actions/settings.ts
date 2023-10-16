@@ -1,29 +1,28 @@
 import { Map as ImmutableMap, List as ImmutableList, OrderedSet as ImmutableOrderedSet } from 'immutable';
-import { defineMessages } from 'react-intl';
+import { defineMessage } from 'react-intl';
 import { createSelector } from 'reselect';
 import { v4 as uuid } from 'uuid';
 
 import { patchMe } from 'soapbox/actions/me';
+import messages from 'soapbox/messages';
 import toast from 'soapbox/toast';
 import { isLoggedIn } from 'soapbox/utils/auth';
 
 import type { AppDispatch, RootState } from 'soapbox/store';
 
-const SETTING_CHANGE = 'SETTING_CHANGE';
-const SETTING_SAVE   = 'SETTING_SAVE';
-const SETTINGS_UPDATE = 'SETTINGS_UPDATE';
+const SETTING_CHANGE = 'SETTING_CHANGE' as const;
+const SETTING_SAVE   = 'SETTING_SAVE' as const;
+const SETTINGS_UPDATE = 'SETTINGS_UPDATE' as const;
 
 const FE_NAME = 'soapbox_fe';
 
 /** Options when changing/saving settings. */
 type SettingOpts = {
   /** Whether to display an alert when settings are saved. */
-  showAlert?: boolean,
+  showAlert?: boolean
 }
 
-const messages = defineMessages({
-  saveSuccess: { id: 'settings.save.success', defaultMessage: 'Your preferences have been saved!' },
-});
+const saveSuccessMessage = defineMessage({ id: 'settings.save.success', defaultMessage: 'Your preferences have been saved!' });
 
 const defaultSettings = ImmutableMap({
   onboarded: false,
@@ -40,11 +39,12 @@ const defaultSettings = ImmutableMap({
   defaultPrivacy: 'public',
   defaultContentType: 'text/plain',
   themeMode: 'system',
-  locale: navigator.language.split(/[-_]/)[0] || 'en',
+  locale: navigator.language || 'en',
   showExplanationBox: true,
   explanationBox: true,
   autoloadTimelines: true,
   autoloadMore: true,
+  preserveSpoilers: false,
 
   systemFont: false,
   demetricator: false,
@@ -156,6 +156,8 @@ const defaultSettings = ImmutableMap({
     }),
   }),
 
+  groups: ImmutableMap({}),
+
   trends: ImmutableMap({
     show: true,
   }),
@@ -180,25 +182,33 @@ const getSettings = createSelector([
     .mergeDeep(settings);
 });
 
+interface SettingChangeAction {
+  type: typeof SETTING_CHANGE
+  path: string[]
+  value: any
+}
+
 const changeSettingImmediate = (path: string[], value: any, opts?: SettingOpts) =>
   (dispatch: AppDispatch) => {
-    dispatch({
+    const action: SettingChangeAction = {
       type: SETTING_CHANGE,
       path,
       value,
-    });
+    };
 
+    dispatch(action);
     dispatch(saveSettingsImmediate(opts));
   };
 
 const changeSetting = (path: string[], value: any, opts?: SettingOpts) =>
   (dispatch: AppDispatch) => {
-    dispatch({
+    const action: SettingChangeAction = {
       type: SETTING_CHANGE,
       path,
       value,
-    });
+    };
 
+    dispatch(action);
     return dispatch(saveSettings(opts));
   };
 
@@ -219,7 +229,7 @@ const saveSettingsImmediate = (opts?: SettingOpts) =>
       dispatch({ type: SETTING_SAVE });
 
       if (opts?.showAlert) {
-        toast.success(messages.saveSuccess);
+        toast.success(saveSuccessMessage);
       }
     }).catch(error => {
       toast.showAlertForError(error);
@@ -228,6 +238,16 @@ const saveSettingsImmediate = (opts?: SettingOpts) =>
 
 const saveSettings = (opts?: SettingOpts) =>
   (dispatch: AppDispatch) => dispatch(saveSettingsImmediate(opts));
+
+const getLocale = (state: RootState, fallback = 'en') => {
+  const localeWithVariant = (getSettings(state).get('locale') as string).replace('_', '-');
+  const locale = localeWithVariant.split('-')[0];
+  return Object.keys(messages).includes(localeWithVariant) ? localeWithVariant : Object.keys(messages).includes(locale) ? locale : fallback;
+};
+
+type SettingsAction =
+  | SettingChangeAction
+  | { type: typeof SETTING_SAVE }
 
 export {
   SETTING_CHANGE,
@@ -240,4 +260,6 @@ export {
   changeSetting,
   saveSettingsImmediate,
   saveSettings,
+  getLocale,
+  type SettingsAction,
 };

@@ -17,6 +17,18 @@ const overrides = custom('features');
 const any = (arr: Array<any>): boolean => arr.some(Boolean);
 
 /**
+ * Firefish, a fork of Misskey. Formerly known as Calckey.
+ * @see {@link https://joinfirefish.org/}
+ */
+export const FIREFISH = 'Firefish';
+
+/**
+ * Ditto, a Nostr server with Mastodon API.
+ * @see {@link https://gitlab.com/soapbox-pub/ditto}
+ */
+export const DITTO = 'Ditto';
+
+/**
  * Friendica, decentralized social platform implementing multiple federation protocols.
  * @see {@link https://friendi.ca/}
  */
@@ -82,6 +94,9 @@ export const GLITCH = 'glitch';
 // NOTE: Rebased is named 'soapbox' for legacy reasons.
 export const REBASED = 'soapbox';
 
+/** Backend name reserved only for tests. */
+export const UNRELEASED = 'unreleased';
+
 /** Parse features for the given instance */
 const getInstanceFeatures = (instance: Instance) => {
   const v = parseVersion(instance.version);
@@ -130,10 +145,12 @@ const getInstanceFeatures = (instance: Instance) => {
      * @see GET /api/v1/accounts/lookup
      */
     accountLookup: any([
+      v.software === FIREFISH,
       v.software === MASTODON && gte(v.compatVersion, '3.4.0'),
       v.software === PLEROMA && gte(v.version, '2.4.50'),
       v.software === TAKAHE && gte(v.version, '0.6.1'),
       v.software === TRUTHSOCIAL,
+      v.software === DITTO,
     ]),
 
     /**
@@ -214,6 +231,7 @@ const getInstanceFeatures = (instance: Instance) => {
      * @see GET /api/v1/bookmarks
      */
     bookmarks: any([
+      v.software === FIREFISH,
       v.software === FRIENDICA,
       v.software === MASTODON && gte(v.compatVersion, '3.1.0'),
       v.software === PLEROMA && gte(v.version, '0.9.9'),
@@ -249,12 +267,17 @@ const getInstanceFeatures = (instance: Instance) => {
     chatAcceptance: v.software === TRUTHSOCIAL,
 
     /**
+     * Ability to add reactions to chat messages.
+     */
+    chatEmojiReactions: v.software === TRUTHSOCIAL,
+
+    /**
      * Pleroma chats API.
      * @see {@link https://docs.pleroma.social/backend/development/API/chats/}
      */
     chats: any([
       v.software === TRUTHSOCIAL,
-      v.software === PLEROMA && gte(v.version, '2.1.0') && v.build !== AKKOMA,
+      features.includes('pleroma_chat_messages'),
     ]),
 
     /**
@@ -276,7 +299,7 @@ const getInstanceFeatures = (instance: Instance) => {
      * Whether chat messages can accept a `media_id` attachment.
      * @see POST /api/v1/pleroma/chats/:id/messages
      */
-    chatsMedia: v.software !== TRUTHSOCIAL,
+    chatsMedia: v.software !== TRUTHSOCIAL || v.build === UNRELEASED,
 
     /**
      * Whether chat messages have read receipts.
@@ -306,14 +329,24 @@ const getInstanceFeatures = (instance: Instance) => {
 
     /**
      * Mastodon's newer solution for direct messaging.
-     * @see {@link https://docs.joinmastodon.org/methods/timelines/conversations/}
+     * @see {@link https://docs.joinmastodon.org/methods/conversations/}
      */
     conversations: any([
+      v.software === FIREFISH,
       v.software === FRIENDICA,
       v.software === MASTODON && gte(v.compatVersion, '2.6.0'),
       v.software === PLEROMA && gte(v.version, '0.9.9'),
       v.software === PIXELFED,
       v.software === TAKAHE,
+    ]),
+
+    /**
+     * Ability to add non-standard reactions to a status.
+     */
+    customEmojiReacts: any([
+      features.includes('pleroma_custom_emoji_reactions'),
+      features.includes('custom_emoji_reactions'),
+      v.software === PLEROMA && gte(v.version, '2.5.50'),
     ]),
 
     /**
@@ -327,10 +360,18 @@ const getInstanceFeatures = (instance: Instance) => {
     ]),
 
     /**
+     * @see POST /api/friendica/statuses/:id/dislike
+     * @see POST /api/friendica/statuses/:id/undislike
+     * @see GET  /api/friendica/statuses/:id/disliked_by
+     */
+    dislikes: v.software === FRIENDICA && gte(v.version, '2023.3.0'),
+
+    /**
      * Ability to edit profile information.
      * @see PATCH /api/v1/accounts/update_credentials
      */
     editProfile: any([
+      v.software === FIREFISH,
       v.software === FRIENDICA,
       v.software === MASTODON,
       v.software === MITRA,
@@ -342,6 +383,7 @@ const getInstanceFeatures = (instance: Instance) => {
     ]),
 
     editStatuses: any([
+      v.software === FRIENDICA && gte(v.version, '2022.12.0'),
       v.software === MASTODON && gte(v.version, '3.5.0'),
       features.includes('editing'),
     ]),
@@ -374,10 +416,10 @@ const getInstanceFeatures = (instance: Instance) => {
     emojiReacts: v.software === PLEROMA && gte(v.version, '2.0.0'),
 
     /**
-     * The backend allows only RGI ("Recommended for General Interchange") emoji reactions.
+     * The backend allows only non-RGI ("Recommended for General Interchange") emoji reactions.
      * @see PUT /api/v1/pleroma/statuses/:id/reactions/:emoji
      */
-    emojiReactsRGI: v.software === PLEROMA && gte(v.version, '2.2.49'),
+    emojiReactsNonRGI: v.software === PLEROMA && lt(v.version, '2.2.49'),
 
     /**
      * Sign in with an Ethereum wallet.
@@ -415,6 +457,8 @@ const getInstanceFeatures = (instance: Instance) => {
 
     /** Whether the accounts who favourited or emoji-reacted to a status can be viewed through the API. */
     exposableReactions: any([
+      v.software === FIREFISH,
+      v.software === FRIENDICA,
       v.software === MASTODON,
       v.software === TAKAHE && gte(v.version, '0.6.1'),
       v.software === TRUTHSOCIAL,
@@ -427,6 +471,7 @@ const getInstanceFeatures = (instance: Instance) => {
      */
     familiarFollowers: any([
       v.software === MASTODON && gte(v.version, '3.5.0'),
+      v.software === PLEROMA && gte(v.version, '2.5.51') && v.build === REBASED,
       v.software === TAKAHE,
     ]),
 
@@ -435,18 +480,40 @@ const getInstanceFeatures = (instance: Instance) => {
 
     /**
      * Can edit and manage timeline filters (aka "muted words").
-     * @see {@link https://docs.joinmastodon.org/methods/accounts/filters/}
+     * @see {@link https://docs.joinmastodon.org/methods/filters/#v1}
      */
     filters: any([
       v.software === MASTODON && lt(v.compatVersion, '3.6.0'),
       v.software === PLEROMA,
     ]),
 
+    /** Whether filters can automatically expires. */
+    filtersExpiration: any([
+      v.software === MASTODON,
+      v.software === PLEROMA && gte(v.version, '2.3.0'),
+    ]),
+
+    /**
+     * Can edit and manage timeline filters (aka "muted words").
+     * @see {@link https://docs.joinmastodon.org/methods/filters/}
+     */
+    filtersV2: v.software === MASTODON && gte(v.compatVersion, '3.6.0'),
+
     /**
      * Allows setting the focal point of a media attachment.
-     * @see {@link https://docs.joinmastodon.org/methods/statuses/media/}
+     * @see {@link https://docs.joinmastodon.org/methods/media/}
      */
     focalPoint: v.software === MASTODON && gte(v.compatVersion, '2.3.0'),
+
+    /**
+     * Ability to follow hashtags.
+     * @see POST /api/v1/tags/:name/follow
+     * @see POST /api/v1/tags/:name/unfollow
+     */
+    followHashtags: any([
+      v.software === MASTODON && gte(v.compatVersion, '4.0.0'),
+      v.software === PLEROMA && v.build === AKKOMA,
+    ]),
 
     /**
      * Ability to lock accounts and manually approve followers.
@@ -458,10 +525,92 @@ const getInstanceFeatures = (instance: Instance) => {
     ]),
 
     /**
+     * Ability to list followed hashtags.
+     * @see GET /api/v1/followed_tags
+     */
+    followedHashtagsList: v.software === MASTODON && gte(v.compatVersion, '4.1.0'),
+
+    /**
      * Whether client settings can be retrieved from the API.
      * @see GET /api/pleroma/frontend_configurations
      */
-    frontendConfigurations: v.software === PLEROMA,
+    frontendConfigurations: any([
+      v.software === PLEROMA,
+      v.software === DITTO,
+    ]),
+
+    /**
+     * Groups.
+     * @see POST /api/v1/groups
+     * @see GET /api/v1/groups
+     * @see GET /api/v1/groups/:id
+     * @see POST /api/v1/groups/:id/join
+     * @see POST /api/v1/groups/:id/leave
+     * @see GET /api/v1/groups/:id/memberships
+     * @see PUT /api/v1/groups/:group_id
+     * @see DELETE /api/v1/groups/:group_id
+     * @see GET /api/v1/groups/:group_id/membership_requests
+     * @see POST /api/v1/groups/:group_id/membership_requests/:account_id/authorize
+     * @see POST /api/v1/groups/:group_id/membership_requests/:account_id/reject
+     * @see DELETE /api/v1/groups/:group_id/statuses/:id
+     * @see POST /api/v1/groups/:group_id/kick?account_ids[]=…
+     * @see GET /api/v1/groups/:group_id/blocks
+     * @see POST /api/v1/groups/:group_id/blocks?account_ids[]=…
+     * @see DELETE /api/v1/groups/:group_id/blocks?account_ids[]=…
+     * @see POST /api/v1/groups/:group_id/promote?role=new_role&account_ids[]=…
+     * @see POST /api/v1/groups/:group_id/demote?role=new_role&account_ids[]=…
+     * @see GET /api/v1/admin/groups
+     * @see GET /api/v1/admin/groups/:group_id
+     * @see POST /api/v1/admin/groups/:group_id/suspend
+     * @see POST /api/v1/admin/groups/:group_id/unsuspend
+     * @see DELETE /api/v1/admin/groups/:group_id
+     */
+    groups: v.software === TRUTHSOCIAL,
+
+    /**
+     * Cap # of Group Admins to 5
+     */
+    groupsAdminMax: v.software === TRUTHSOCIAL,
+
+    /**
+     * Can see trending/suggested Groups.
+     */
+    groupsDiscovery: v.software === TRUTHSOCIAL,
+
+    /**
+     * Can kick user from Group.
+     */
+    groupsKick: v.software !== TRUTHSOCIAL,
+
+    /**
+     * Can mute a Group.
+     */
+    groupsMuting: v.software === TRUTHSOCIAL,
+
+    /**
+     * Can query pending Group requests.
+    */
+    groupsPending: v.software === TRUTHSOCIAL,
+
+    /**
+    * Can promote members to Admins.
+    */
+    groupsPromoteToAdmin: v.software !== TRUTHSOCIAL,
+
+    /**
+     * Can search my own groups.
+     */
+    groupsSearch: v.software === TRUTHSOCIAL,
+
+    /**
+     * Can see topics for Groups.
+     */
+    groupsTags: v.software === TRUTHSOCIAL,
+
+    /**
+     * Can validate group names.
+     */
+    groupsValidation: v.software === TRUTHSOCIAL,
 
     /**
      * Can hide follows/followers lists and counts.
@@ -487,13 +636,22 @@ const getInstanceFeatures = (instance: Instance) => {
 
     /**
      * Can create, view, and manage lists.
-     * @see {@link https://docs.joinmastodon.org/methods/timelines/lists/}
+     * @see {@link https://docs.joinmastodon.org/methods/lists/}
      * @see GET /api/v1/timelines/list/:list_id
      */
     lists: any([
+      v.software === FIREFISH,
       v.software === FRIENDICA,
       v.software === MASTODON && gte(v.compatVersion, '2.1.0'),
       v.software === PLEROMA && gte(v.version, '0.9.9'),
+    ]),
+
+    /**
+     * Can sign in using username instead of e-mail address.
+     */
+    logInWithUsername: any([
+      v.software === PLEROMA,
+      v.software === TRUTHSOCIAL,
     ]),
 
     /**
@@ -544,6 +702,12 @@ const getInstanceFeatures = (instance: Instance) => {
     ]),
 
     /**
+     * Ability to sign Nostr events over websocket.
+     * @see GET /api/v1/streaming?stream=nostr
+     */
+    nostrSign: v.software === DITTO,
+
+    /**
      * Add private notes to accounts.
      * @see POST /api/v1/accounts/:id/note
      * @see GET /api/v1/accounts/relationships
@@ -589,6 +753,7 @@ const getInstanceFeatures = (instance: Instance) => {
      * @see POST /api/v1/statuses
      */
     polls: any([
+      v.software === FIREFISH,
       v.software === MASTODON && gte(v.version, '2.8.0'),
       v.software === PLEROMA,
       v.software === TRUTHSOCIAL,
@@ -598,11 +763,11 @@ const getInstanceFeatures = (instance: Instance) => {
      * Can set privacy scopes on statuses.
      * @see POST /api/v1/statuses
      */
-    privacyScopes: v.software !== TRUTHSOCIAL,
+    privacyScopes: ![TRUTHSOCIAL, DITTO].includes(v.software!),
 
     /**
      * A directory of discoverable profiles from the instance.
-     * @see {@link https://docs.joinmastodon.org/methods/instance/directory/}
+     * @see {@link https://docs.joinmastodon.org/methods/directory/}
      */
     profileDirectory: any([
       v.software === FRIENDICA,
@@ -625,11 +790,13 @@ const getInstanceFeatures = (instance: Instance) => {
      * @see GET /api/v1/timelines/public
      */
     publicTimeline: any([
+      v.software === FIREFISH,
       v.software === FRIENDICA,
       v.software === MASTODON,
       v.software === PLEROMA,
       v.software === TAKAHE,
       v.software === WILDEBEEST,
+      v.software === DITTO,
     ]),
 
     /**
@@ -637,7 +804,9 @@ const getInstanceFeatures = (instance: Instance) => {
      * @see POST /api/v1/statuses
      */
     quotePosts: any([
+      v.software === FRIENDICA && gte(v.version, '2023.3.0'),
       v.software === PLEROMA && [REBASED, AKKOMA].includes(v.build!) && gte(v.version, '2.4.50'),
+      features.includes('quote_posting'),
       instance.feature_quote === true,
     ]),
 
@@ -684,11 +853,20 @@ const getInstanceFeatures = (instance: Instance) => {
     ]),
 
     /**
+     * Ability to follow account feeds using RSS.
+     */
+    rssFeeds: any([
+      v.software === MASTODON,
+      v.software === PLEROMA,
+    ]),
+
+    /**
      * Can schedule statuses to be posted at a later time.
      * @see POST /api/v1/statuses
-     * @see {@link https://docs.joinmastodon.org/methods/statuses/scheduled_statuses/}
+     * @see {@link https://docs.joinmastodon.org/methods/scheduled_statuses/}
      */
     scheduledStatuses: any([
+      v.software === FRIENDICA,
       v.software === MASTODON && gte(v.version, '2.7.0'),
       v.software === PLEROMA,
     ]),
@@ -738,7 +916,7 @@ const getInstanceFeatures = (instance: Instance) => {
 
     /**
      * Can display suggested accounts.
-     * @see {@link https://docs.joinmastodon.org/methods/accounts/suggestions/}
+     * @see {@link https://docs.joinmastodon.org/methods/suggestions/}
      */
     suggestions: any([
       v.software === MASTODON && gte(v.compatVersion, '2.4.3'),
@@ -767,7 +945,10 @@ const getInstanceFeatures = (instance: Instance) => {
      * Trending statuses.
      * @see GET /api/v1/trends/statuses
      */
-    trendingStatuses: v.software === MASTODON && gte(v.compatVersion, '3.5.0'),
+    trendingStatuses: any([
+      v.software === FRIENDICA && gte(v.version, '2022.12.0'),
+      v.software === MASTODON && gte(v.compatVersion, '3.5.0'),
+    ]),
 
     /**
      * Truth Social trending statuses API.
@@ -780,8 +961,10 @@ const getInstanceFeatures = (instance: Instance) => {
      * @see GET /api/v1/trends
      */
     trends: any([
+      v.software === FRIENDICA && gte(v.version, '2022.12.0'),
       v.software === MASTODON && gte(v.compatVersion, '3.0.0'),
       v.software === TRUTHSOCIAL,
+      v.software === DITTO,
     ]),
 
     /**
@@ -818,22 +1001,24 @@ export const getFeatures = createSelector([
 /** Fediverse backend */
 interface Backend {
   /** Build name, if this software is a fork */
-  build: string | null,
+  build: string | null
   /** Name of the software */
-  software: string | null,
+  software: string | null
   /** API version number */
-  version: string,
+  version: string
   /** Mastodon API version this backend is compatible with */
-  compatVersion: string,
+  compatVersion: string
 }
 
 /** Get information about the software from its version string */
 export const parseVersion = (version: string): Backend => {
-  const regex = /^([\w+.]*)(?: \(compatible; ([\w]*) (.*)\))?$/;
+  const regex = /^([\w+.-]*)(?: \(compatible; ([\w]*) (.*)\))?$/;
   const match = regex.exec(version);
 
   const semverString = match && (match[3] || match[1]);
-  const semver = match ? semverParse(semverString) || semverCoerce(semverString) : null;
+  const semver = match ? semverParse(semverString) || semverCoerce(semverString, {
+    loose: true,
+  }) : null;
   const compat = match ? semverParse(match[1]) || semverCoerce(match[1]) : null;
 
   if (match && semver && compat) {

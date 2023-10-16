@@ -1,8 +1,9 @@
-import { RootState } from 'soapbox/store';
+import { AppDispatch, RootState } from 'soapbox/store';
 
 import api from '../api';
 
-import { ACCOUNTS_IMPORT, importFetchedAccounts } from './importer';
+import { fetchRelationships } from './accounts';
+import { importFetchedAccounts } from './importer';
 
 import type { APIEntity } from 'soapbox/types/entities';
 
@@ -10,31 +11,7 @@ export const FAMILIAR_FOLLOWERS_FETCH_REQUEST = 'FAMILIAR_FOLLOWERS_FETCH_REQUES
 export const FAMILIAR_FOLLOWERS_FETCH_SUCCESS = 'FAMILIAR_FOLLOWERS_FETCH_SUCCESS';
 export const FAMILIAR_FOLLOWERS_FETCH_FAIL    = 'FAMILIAR_FOLLOWERS_FETCH_FAIL';
 
-type FamiliarFollowersFetchRequestAction = {
-  type: typeof FAMILIAR_FOLLOWERS_FETCH_REQUEST,
-  id: string,
-}
-
-type FamiliarFollowersFetchRequestSuccessAction = {
-  type: typeof FAMILIAR_FOLLOWERS_FETCH_SUCCESS,
-  id: string,
-  accounts: Array<APIEntity>,
-}
-
-type FamiliarFollowersFetchRequestFailAction = {
-  type: typeof FAMILIAR_FOLLOWERS_FETCH_FAIL,
-  id: string,
-  error: any,
-}
-
-type AccountsImportAction = {
-  type: typeof ACCOUNTS_IMPORT,
-  accounts: Array<APIEntity>,
-}
-
-export type FamiliarFollowersActions = FamiliarFollowersFetchRequestAction | FamiliarFollowersFetchRequestSuccessAction | FamiliarFollowersFetchRequestFailAction | AccountsImportAction
-
-export const fetchAccountFamiliarFollowers = (accountId: string) => (dispatch: React.Dispatch<FamiliarFollowersActions>, getState: () => RootState) => {
+export const fetchAccountFamiliarFollowers = (accountId: string) => (dispatch: AppDispatch, getState: () => RootState) => {
   dispatch({
     type: FAMILIAR_FOLLOWERS_FETCH_REQUEST,
     id: accountId,
@@ -44,7 +21,8 @@ export const fetchAccountFamiliarFollowers = (accountId: string) => (dispatch: R
     .then(({ data }) => {
       const accounts = data.find(({ id }: { id: string }) => id === accountId).accounts;
 
-      dispatch(importFetchedAccounts(accounts) as AccountsImportAction);
+      dispatch(importFetchedAccounts(accounts));
+      dispatch(fetchRelationships(accounts.map((item: APIEntity) => item.id)));
       dispatch({
         type: FAMILIAR_FOLLOWERS_FETCH_SUCCESS,
         id: accountId,
@@ -55,5 +33,6 @@ export const fetchAccountFamiliarFollowers = (accountId: string) => (dispatch: R
       type: FAMILIAR_FOLLOWERS_FETCH_FAIL,
       id: accountId,
       error,
+      skipAlert: true,
     }));
 };
